@@ -1,10 +1,10 @@
-import * as Convict from 'convict';
+import * as convict from 'convict';
 
 export interface AppConfig {
   port: number;
 }
 
-export const Schema: Convict.Schema<AppConfig> = {
+export const schema: convict.Schema<AppConfig> = {
   general: {
     port: {
       doc: 'Port that is used to bind the API',
@@ -22,17 +22,28 @@ export const Schema: Convict.Schema<AppConfig> = {
       default: 'my-secret',
       arg: 'session_secret',
     },
-    clientId: {
-      doc: 'OpenID Connect Client ID',
-      format: '*',
-      env: 'OIDC_CLIENT_ID',
-      arg: 'oidc_client_id',
-    },
-    clientSecret: {
-      doc: 'OpenID Connect Client Secret',
-      format: '*',
-      env: 'OIDC_CLIENT_SECRET',
-      arg: 'oidc_client_secret',
+    oidc: {
+      issuer: {
+        doc: 'OIDC issuer URL',
+        format: 'String',
+        env: 'OIDC_ISSUER',
+        default: 'https://example.com',
+        arg: 'oidc_issuer',
+      },
+      clientId: {
+        doc: 'OpenID Connect Client ID',
+        format: '*',
+        env: 'OIDC_CLIENT_ID',
+        default: 'client_id',
+        arg: 'oidc_client_id',
+      },
+      clientSecret: {
+        doc: 'OpenID Connect Client Secret',
+        format: '*',
+        env: 'OIDC_CLIENT_SECRET',
+        default: 'client_secret',
+        arg: 'oidc_client_secret',
+      },
     },
   },
 };

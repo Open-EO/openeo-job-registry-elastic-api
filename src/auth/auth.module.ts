@@ -1,18 +1,28 @@
 import { Module } from '@nestjs/common';
-import { OIDCStrategy } from './openid/openid.strategy';
 import { ConfigModule } from '../config/config.module';
 import { APP_GUARD } from '@nestjs/core';
-import { OpenIDGuard } from './openid/openid.guard';
+import { ConfigService } from '../config/config/config.service';
+import { BearerGuard } from './bearer/bearer.guard';
+import { BearerStrategy, buildBearerClient } from './bearer/bearer.strategy';
 
+const BearerStrategyFactory = {
+  provide: 'BearerStrategy',
+  useFactory: async (configService: ConfigService) => {
+    const client = await buildBearerClient(configService); // secret sauce! build the dynamic client before injecting it into the strategy for use in the constructor super call.
+    const strategy = new BearerStrategy(client);
+    return strategy;
+  },
+  inject: [ConfigService],
+};
 @Module({
   imports: [ConfigModule],
   providers: [
-    OIDCStrategy,
+    BearerStrategyFactory,
     {
       provide: APP_GUARD,
-      useClass: OpenIDGuard,
+      useClass: BearerGuard,
     },
   ],
-  exports: [OIDCStrategy],
+  exports: [],
 })
 export class AuthModule {}
