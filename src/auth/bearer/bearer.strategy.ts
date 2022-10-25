@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-http-bearer';
 import { ConfigService } from '../../config/config/config.service';
@@ -19,7 +19,7 @@ export const buildBearerClient = async (configService: ConfigService) => {
 export class BearerStrategy extends PassportStrategy(Strategy, 'bearer') {
   client: Client;
 
-  constructor(client: Client) {
+  constructor(client: Client, private logger: Logger) {
     super({}, (token, verified) => this.verify(token, verified));
     this.client = client;
   }
@@ -33,11 +33,15 @@ export class BearerStrategy extends PassportStrategy(Strategy, 'bearer') {
         if (active) {
           verified(null, {}, null);
         } else {
-          console.warn(`Token is invalid`);
+          this.logger.warn(`Token is invalid`, BearerStrategy.name);
           verified(null, null, 'token_invalid');
         }
       } catch (e) {
-        console.error(`An error occurred while verifying token ${token}`, e);
+        this.logger.error(
+          `An error occurred while verifying token ${token}`,
+          e,
+          BearerStrategy.name,
+        );
       }
     }
   }

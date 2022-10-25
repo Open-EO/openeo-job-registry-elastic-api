@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { ConfigModule } from '../config/config.module';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigService } from '../config/config/config.service';
@@ -7,16 +7,17 @@ import { BearerStrategy, buildBearerClient } from './bearer/bearer.strategy';
 
 const BearerStrategyFactory = {
   provide: 'BearerStrategy',
-  useFactory: async (configService: ConfigService) => {
+  useFactory: async (configService: ConfigService, logger: Logger) => {
     const client = await buildBearerClient(configService); // secret sauce! build the dynamic client before injecting it into the strategy for use in the constructor super call.
-    const strategy = new BearerStrategy(client);
+    const strategy = new BearerStrategy(client, logger);
     return strategy;
   },
-  inject: [ConfigService],
+  inject: [ConfigService, Logger],
 };
 @Module({
   imports: [ConfigModule],
   providers: [
+    Logger,
     BearerStrategyFactory,
     {
       provide: APP_GUARD,
