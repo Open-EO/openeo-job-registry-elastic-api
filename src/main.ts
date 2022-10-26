@@ -22,17 +22,6 @@ const bootstrap = async () => {
   const app = await NestFactory.create(AppModule);
   const configService: ConfigService = app.get(ConfigService);
   setupDocs(app);
-
-  app.use(
-    session({
-      secret: configService.get('auth.sessionSecret'),
-      resave: false,
-      rolling: true,
-      saveUninitialized: false,
-    }),
-  );
-  app.use(passport.session());
-
   await app.listen(configService.get('general.port'));
 };
 

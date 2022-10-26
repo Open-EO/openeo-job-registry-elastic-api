@@ -1,4 +1,5 @@
 import * as convict from 'convict';
+import { AuthType } from '../../auth/models/authtypes.enum';
 
 export interface AppConfig {
   port: number;
@@ -15,12 +16,12 @@ export const schema: convict.Schema<AppConfig> = {
     },
   },
   auth: {
-    sessionSecret: {
-      doc: 'Secret to sign the session of the API',
-      format: '*',
-      env: 'SESSION_SECRET',
-      default: 'my-secret',
-      arg: 'session_secret',
+    type: {
+      doc: 'Authentication type to use within the API',
+      format: Object.values(AuthType),
+      default: AuthType.BEARER,
+      env: 'AUTH_TYPE',
+      arg: 'auth_type',
     },
     oidc: {
       issuer: {
