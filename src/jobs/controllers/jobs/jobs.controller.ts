@@ -1,9 +1,12 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Job } from '../../models/job.dto';
+import { DatabaseService } from '../../services/database/database.service';
 
 @Controller('jobs')
 export class JobsController {
+  constructor(private databaseService: DatabaseService) {}
+
   @Post()
   @ApiOperation({
     tags: ['jobs'],
@@ -14,6 +17,6 @@ export class JobsController {
     isArray: true,
   })
   async storeJobs(@Body() jobs: Job[]): Promise<Job[]> {
-    return jobs;
+    return this.databaseService.saveJobs(jobs);
   }
 }

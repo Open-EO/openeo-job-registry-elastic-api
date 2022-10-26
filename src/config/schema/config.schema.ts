@@ -47,4 +47,20 @@ export const schema: convict.Schema<AppConfig> = {
       },
     },
   },
+  database: {
+    hosts: {
+      doc: 'Comma seperated value list of elasticsearch hosts to use',
+      format: '*',
+      default: 'http://localhost:9200,http://localhost:9201',
+      env: 'DB_HOSTS',
+      arg: 'db_hosts',
+    },
+    jobsIdx: {
+      doc: 'Name of the ElasticSearch index that will be used to store the job information',
+      format: '*',
+      default: 'openeo-jobs-dev',
+      env: 'DB_JOBS_IDX',
+      arg: 'db_jobs_idx',
+    },
+  },
 };

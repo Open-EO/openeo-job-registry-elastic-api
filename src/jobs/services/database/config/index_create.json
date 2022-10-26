@@ -1,0 +1,133 @@
+{
+  "settings": {
+    "index": {
+      "number_of_shards": "1",
+      "number_of_replicas": "1"
+    }
+  },
+  "aliases": {
+    "openeo-jobs-dev": {}
+  },
+  "mappings": {
+    "properties": {
+      "job_id": {
+        "type": "keyword"
+      },
+      "parent_id": {
+        "type": "keyword"
+      },
+      "user_id": {
+        "type": "keyword"
+      },
+      "proxy_user": {
+        "type": "keyword"
+      },
+      "status": {
+        "type": "keyword"
+      },
+      "api_version": {
+        "type": "text"
+      },
+      "specification": {
+        "type": "object"
+      },
+      "application_id": {
+        "type": "keyword"
+      },
+      "created": {
+        "type": "date"
+      },
+      "updated": {
+        "type": "date"
+      },
+      "started": {
+        "type": "date"
+      },
+      "finished": {
+        "type": "date"
+      },
+      "start_datetime": {
+        "type": "date"
+      },
+      "end_datetime": {
+        "type": "date"
+      },
+      "title": {
+        "type": "text"
+      },
+      "description": {
+        "type": "text"
+      },
+      "dependencies": {
+        "type": "nested",
+        "properties": {
+          "collection_id": {
+            "type": "keyword"
+          },
+          "batch_request_ids": {
+            "type": "keyword"
+          },
+          "results_location": {
+            "type": "keyword"
+          },
+          "card4l": {
+            "type": "boolean"
+          }
+        }
+      },
+      "dependency_status": {
+        "type": "keyword"
+      },
+      "memory_time_megabyte_seconds": {
+        "type": "long"
+      },
+      "cpu_time_seconds": {
+        "type": "long"
+      },
+      "geometry": {
+        "type": "object"
+      },
+      "bbox": {
+        "type": "double"
+      },
+      "area": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "double"
+          },
+          "unit": {
+            "type": "keyword"
+          }
+        }
+      },
+      "links": {
+        "type": "keyword"
+      },
+      "assets": {
+        "type": "object"
+      },
+      "epsg": {
+        "type": "integer"
+      },
+      "instruments": {
+        "type": "keyword"
+      },
+      "processing_facility": {
+        "type": "keyword"
+      },
+      "processing_software": {
+        "type": "keyword"
+      },
+      "unique_service_ids": {
+        "type": "keyword"
+      },
+      "usage": {
+        "type": "object"
+      },
+      "job_options": {
+        "type": "object"
+      }
+    }
+  }
+}
