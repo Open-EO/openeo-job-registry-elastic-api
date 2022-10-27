@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { JobsController } from './controllers/jobs/jobs.controller';
 import { ElasticsearchModule } from '@nestjs/elasticsearch';
 import { ConfigModule } from '../config/config.module';
@@ -20,6 +20,6 @@ import { DatabaseService } from './services/database/database.service';
       inject: [ConfigService],
     }),
   ],
-  providers: [DatabaseService],
+  providers: [DatabaseService, Logger],
 })
 export class JobsModule {}
