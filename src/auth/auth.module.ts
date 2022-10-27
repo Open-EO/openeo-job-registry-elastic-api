@@ -1,10 +1,8 @@
 import { Logger, Module } from '@nestjs/common';
 import { ConfigModule } from '../config/config.module';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, Reflector } from '@nestjs/core';
 import { ConfigService } from '../config/config/config.service';
-import { BearerGuard } from './bearer/bearer.guard';
 import { BearerStrategy, buildBearerClient } from './bearer/bearer.strategy';
-import { AuthType } from './models/authtypes.enum';
 import { AuthService } from './auth.service';
 
 const BearerStrategyFactory = {
@@ -25,8 +23,9 @@ const BearerStrategyFactory = {
     BearerStrategyFactory,
     {
       provide: APP_GUARD,
-      useFactory: (authService: AuthService) => authService.getAuthGuard(),
-      inject: [AuthService],
+      useFactory: (authService: AuthService, reflector: Reflector) =>
+        authService.getAuthGuard(reflector),
+      inject: [AuthService, Reflector],
     },
   ],
   exports: [],

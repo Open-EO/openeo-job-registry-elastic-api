@@ -8,6 +8,7 @@ import {
 import { ApiBody, ApiOperation } from '@nestjs/swagger';
 import { Job } from '../../models/job.dto';
 import { DatabaseService } from '../../services/database/database.service';
+import { Public } from '../../../auth/decorators/public.decorator';
 
 @Controller('jobs')
 export class JobsController {
@@ -38,6 +39,7 @@ export class JobsController {
     description: 'Query supported by ElasticSearch',
     required: true,
   })
+  @Public()
   async queryJobs(@Body() query: any): Promise<Job[]> {
     try {
       const jobs: Job[] = await this.databaseService.queryJobs(query);
