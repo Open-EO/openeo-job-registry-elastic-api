@@ -39,6 +39,7 @@ export class JobsController {
     summary: 'Search for reported jobs using an ElasticSearch query',
   })
   @ApiBody({
+    type: Object,
     description: 'Query supported by ElasticSearch',
     required: true,
   })
