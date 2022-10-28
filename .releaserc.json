@@ -1,0 +1,33 @@
+{
+  "branches": [
+    "master"
+  ],
+  "plugins": [
+    [
+      "commit-analyzer-fail-on-no-release",
+      {
+        "preset": "angular",
+        "releaseRules": [
+          {
+            "type": "refactor",
+            "release": "patch"
+          },
+          {
+            "type": "style",
+            "release": "patch"
+          },
+          {
+            "type": "docs",
+            "release": "patch"
+          }
+        ]
+      }
+    ],
+    [
+      "@semantic-release/npm",
+      {
+        "npmPublish": false
+      }
+    ]
+  ]
+}
