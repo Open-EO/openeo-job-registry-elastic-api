@@ -45,8 +45,7 @@ export class JobsController {
   @Public()
   async queryJobs(@Body() query: any): Promise<Job[]> {
     try {
-      const jobs: Job[] = await this.databaseService.queryJobs(query);
-      return jobs;
+      return (await this.databaseService.queryJobs(query)) as Job[];
     } catch (error: any) {
       this.logger.error(`Could not query jobs`, error, JobsController.name);
       throw new InternalServerErrorException(
@@ -68,10 +67,13 @@ export class JobsController {
     if (!update.job_id) {
       throw new BadRequestException(`No job_id specified in body`);
     }
-    const job: Job = await this.databaseService.getJobById(update.job_id);
-
-    if (!job) {
-      throw new NotFoundException(`Could not find job with ${job.job_id}`);
+    // Check if the job to update exists in the database
+    const jobID: string = await this.databaseService.getJobDocId(update.job_id);
+    if (!jobID) {
+      throw new NotFoundException(`Could not find job with ${update.job_id}`);
     }
+
+    // Partially update the document
+    return this.databaseService.patchJob(jobID, update);
   }
 }
