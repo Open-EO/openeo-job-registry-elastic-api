@@ -25,16 +25,23 @@ jobs:
         cache: 'npm'
     - run: npm install
     - run: npm run build
-    - run: npm run release
-    - id: version
-      run: npm pkg get version | tr -d '"'  
-    
-    
+
   deploy:
     needs: build
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js 18.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: 'npm'
+      - run: npm install
+      - run: npm run release
+      - id: version
+        run: npm pkg get version | tr -d '"'
+      - run: npm run build
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
@@ -48,6 +55,6 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           push: false
-          tags: openeo-job-tracker-elastic-api:${{needs.build.outputs.version}},openeo-job-tracker-elastic-api:latest
+          tags: openeo-job-tracker-elastic-api:${{steps.version}},openeo-job-tracker-elastic-api:latest
     
  
