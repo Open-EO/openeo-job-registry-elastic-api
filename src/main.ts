@@ -5,6 +5,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { version } from '../package.json';
 import * as passport from 'passport';
 import * as session from 'express-session';
+import { ValidationPipe } from '@nestjs/common';
 
 const setupDocs = (app) => {
   const config = new DocumentBuilder()
@@ -22,6 +23,11 @@ const bootstrap = async () => {
   const app = await NestFactory.create(AppModule);
   const configService: ConfigService = app.get(ConfigService);
   setupDocs(app);
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+    }),
+  );
   await app.listen(configService.get('general.port'));
 };
 
