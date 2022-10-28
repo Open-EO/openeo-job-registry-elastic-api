@@ -1,8 +1,11 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
+  Patch,
   Post,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation } from '@nestjs/swagger';
@@ -49,6 +52,26 @@ export class JobsController {
       throw new InternalServerErrorException(
         `Could not query jobs: ${error.message}`,
       );
+    }
+  }
+
+  @Patch()
+  @ApiOperation({
+    tags: ['jobs'],
+    summary: 'Update the information of an existing job',
+  })
+  @ApiBody({
+    type: Job,
+    required: true,
+  })
+  async patchJob(@Body() update: Job): Promise<Job> {
+    if (!update.job_id) {
+      throw new BadRequestException(`No job_id specified in body`);
+    }
+    const job: Job = await this.databaseService.getJobById(update.job_id);
+
+    if (!job) {
+      throw new NotFoundException(`Could not find job with ${job.job_id}`);
     }
   }
 }

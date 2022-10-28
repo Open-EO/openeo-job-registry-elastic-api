@@ -29,6 +29,28 @@ export class DatabaseService {
   }
 
   /**
+   * Get the job information for a specific ID
+   * @param id - ID of the job to search for
+   */
+  public async getJobById(id: string): Promise<Job> {
+    const query = {
+      query: {
+        bool: {
+          must: [
+            {
+              match: {
+                job_id: id,
+              },
+            },
+          ],
+        },
+      },
+    };
+    const jobs = await this.queryJobs(query);
+    return jobs.length > 0 ? jobs[0] : undefined;
+  }
+
+  /**
    * Given an ElasticSearch query, return the list of jobs that matches the query
    * @param query
    */
