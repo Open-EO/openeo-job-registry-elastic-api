@@ -36,6 +36,7 @@ export class JobDependency {
   @IsOptional()
   @ApiProperty({
     description: 'ID of the collection',
+    required: false,
   })
   collection_id?: string;
 
@@ -43,12 +44,14 @@ export class JobDependency {
   @IsArray()
   @ApiProperty({
     description: 'Batch request IDs',
+    required: false,
   })
   batch_request_ids?: string[];
 
   @IsOptional()
   @ApiProperty({
     description: 'URL where the results are stored',
+    required: false,
   })
   results_location?: string;
 
@@ -56,6 +59,7 @@ export class JobDependency {
   @IsBoolean()
   @ApiProperty({
     description: 'Card4L flag',
+    required: false,
   })
   card4l?: boolean;
 }
@@ -70,42 +74,49 @@ export class Job {
   @IsOptional()
   @ApiProperty({
     description: 'ID of the parent job',
+    required: false,
   })
   parent_id?: string;
 
   @IsOptional()
   @ApiProperty({
     description: 'ID of the user who executed the job',
+    required: false,
   })
   user_id?: string;
 
   @IsOptional()
   @ApiProperty({
     description: 'Proxy user used to execute the job',
+    required: false,
   })
   proxy_user?: string;
 
   @IsOptional()
   @ApiProperty({
     description: 'Status of the job',
+    required: false,
   })
   status?: string;
 
   @IsOptional()
   @ApiProperty({
     description: 'Version of the openEO API',
+    required: false,
   })
   api_version?: string;
 
   @IsOptional()
   @ApiProperty({
     description: 'Processing graph used by the job',
+    required: false,
   })
   specification?: any;
 
   @IsOptional()
   @ApiProperty({
     description: 'ID of the application linked to the job',
+    required: false,
   })
   application_id?: string;
 
@@ -113,6 +124,7 @@ export class Job {
   @IsDateString()
   @ApiProperty({
     description: 'Creation timestamp of the job',
+    required: false,
   })
   created?: string;
 
@@ -120,6 +132,7 @@ export class Job {
   @IsDateString()
   @ApiProperty({
     description: 'Last update timestamp of the job',
+    required: false,
   })
   updated?: string;
 
@@ -127,6 +140,7 @@ export class Job {
   @IsDateString()
   @ApiProperty({
     description: 'Start timestamp of the job',
+    required: false,
   })
   started?: string;
 
@@ -134,6 +148,7 @@ export class Job {
   @IsDateString()
   @ApiProperty({
     description: 'Finish timestamp of the job',
+    required: false,
   })
   finished?: string;
 
@@ -141,6 +156,7 @@ export class Job {
   @IsDateString()
   @ApiProperty({
     description: 'Start timestamp of the job',
+    required: false,
   })
   start_datetime?: string;
 
@@ -148,18 +164,21 @@ export class Job {
   @IsDateString()
   @ApiProperty({
     description: 'Finish timestamp of the job',
+    required: false,
   })
   end_datetime?: string;
 
   @IsOptional()
   @ApiProperty({
     description: 'Title of the job',
+    required: false,
   })
   title?: string;
 
   @IsOptional()
   @ApiProperty({
     description: 'Description of the job',
+    required: false,
   })
   description?: string;
 
@@ -168,12 +187,14 @@ export class Job {
   @IsArray()
   @ApiProperty({
     description: 'List of the dependencies of the job',
+    required: false,
   })
   dependencies?: JobDependency[];
 
   @IsOptional()
   @ApiProperty({
     description: 'Status of the dependencies',
+    required: false,
   })
   dependency_status?: string;
 
@@ -181,6 +202,7 @@ export class Job {
   @IsPositive()
   @ApiProperty({
     description: 'Memory time in MB/s used by the job',
+    required: false,
   })
   memory_time_megabyte_seconds?: number;
 
@@ -188,12 +210,14 @@ export class Job {
   @IsPositive()
   @ApiProperty({
     description: 'CPU time in seconds used by the job',
+    required: false,
   })
   cpu_time_seconds?: number;
 
   @IsOptional()
   @ApiProperty({
     description: 'Geometry processed by the job',
+    required: false,
   })
   geometry?: any;
 
@@ -204,6 +228,7 @@ export class Job {
   @IsNumber({}, { each: true })
   @ApiProperty({
     description: 'Extend processed by the job',
+    required: false,
   })
   bbox?: number[];
 
@@ -211,6 +236,7 @@ export class Job {
   @ValidateNested()
   @ApiProperty({
     description: 'Area processed by the job',
+    required: false,
   })
   area?: JobArea;
 
@@ -218,12 +244,14 @@ export class Job {
   @IsArray()
   @ApiProperty({
     description: 'Links related to the job',
+    required: false,
   })
   links?: string[];
 
   @IsOptional()
   @ApiProperty({
     description: 'Assets related to the job',
+    required: false,
   })
   assets?: any;
 
@@ -231,6 +259,7 @@ export class Job {
   @IsNumber()
   @ApiProperty({
     description: 'EPSG code used while executing the job',
+    required: false,
   })
   epsg?: number;
 
@@ -238,18 +267,21 @@ export class Job {
   @IsArray()
   @ApiProperty({
     description: 'Instruments used by the job',
+    required: false,
   })
   instruments?: string[];
 
   @IsOptional()
   @ApiProperty({
     description: 'Facility where job is executed',
+    required: false,
   })
   processing_facility?: string;
 
   @IsOptional()
   @ApiProperty({
     description: 'Software version usede by the job',
+    required: false,
   })
   processing_software?: string;
 
@@ -257,18 +289,21 @@ export class Job {
   @IsArray()
   @ApiProperty({
     description: 'Services that are executed by the job',
+    required: false,
   })
   unique_process_ids?: string[];
 
   @IsOptional()
   @ApiProperty({
     description: 'Usage of different (external) services',
+    required: false,
   })
   usage?: any;
 
   @IsOptional()
   @ApiProperty({
     description: 'User specified options related to the job execution',
+    required: false,
   })
   job_options?: any;
 }
