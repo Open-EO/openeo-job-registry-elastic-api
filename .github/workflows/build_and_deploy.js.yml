@@ -51,7 +51,7 @@ jobs:
       - name: Build image
         run: docker build -t $DOCKER_IMAGE_NAME .
       - name: Tag image
-        run: docker tag $DOCKER_IMAGE_NAME ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:${{steps.version}} ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:latest
+        run: docker tag $DOCKER_IMAGE_NAME ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:${{steps.version}} && docker tag $DOCKER_IMAGE_NAME  ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:latest
       - name: Push image
         run: docker push ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:${{steps.version}} ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:latest
  
