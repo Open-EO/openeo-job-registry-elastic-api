@@ -54,7 +54,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v3
         with:
-          push: false
+          push: true
           tags: openeo-job-tracker-elastic-api:${{steps.version}},openeo-job-tracker-elastic-api:latest
     
  
