@@ -42,7 +42,7 @@ jobs:
       - run: npm run release
       - id: version
         run: |
-          version = $(npm pkg get version | tr -d '"')
+          version=$(npm pkg get version | tr -d '"')
           echo "::set-output name=version::$version"
       - name: Login to Docker repository
         uses: docker/login-action@v2
