@@ -56,6 +56,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: openeo-job-tracker-elastic-api:${{steps.version}},openeo-job-tracker-elastic-api:latest
+          tags: ${{ secrets.DOCKER_ARTIFACTORY }}/openeo-job-tracker-elastic-api:${{steps.version}},${{ secrets.DOCKER_ARTIFACTORY }}/openeo-job-tracker-elastic-api:latest
     
  
