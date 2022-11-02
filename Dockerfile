@@ -19,6 +19,7 @@ WORKDIR /usr/src/app
 
 #COPY .npmrc ./
 COPY package*.json ./
+RUN npm install --save-dev husky
 RUN npm install --only=production
 COPY --from=builder /usr/src/app/dist ./dist
 
