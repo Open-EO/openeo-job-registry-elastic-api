@@ -8,7 +8,8 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-
+  env:
+    DOKCER_IMAGE_NAME: openeo-job-tracker-elastic-api
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -47,11 +48,10 @@ jobs:
           registry: ${{ secrets.DOCKER_ARTIFACTORY }}
           username: ${{ secrets.ARTIFACTORY_USERNAME }}
           password: ${{ secrets.ARTIFACTORY_PASSWORD }}
-      - name: Build and push
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ secrets.DOCKER_ARTIFACTORY }}/openeo-job-tracker-elastic-api:${{steps.version}},${{ secrets.DOCKER_ARTIFACTORY }}/openeo-job-tracker-elastic-api:latest
-    
+      - name: Build image
+        run: docker build . --tag $DOCKER_IMAGE_NAME
+      - name: Tag image
+        run: docker tag $DOCKER_IMAGE_NAME ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:${{steps.version}} ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:latest
+      - name: Push image
+        run: docker push ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:${{steps.version}} ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:latest
  
