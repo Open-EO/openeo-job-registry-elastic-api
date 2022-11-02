@@ -41,7 +41,9 @@ jobs:
       - run: npm install
       - run: npm run release
       - id: version
-        run: npm pkg get version | tr -d '"'
+        run: |
+          version = $(npm pkg get version | tr -d '"')
+          echo "::set-output name=version::$version"
       - name: Login to Docker repository
         uses: docker/login-action@v2
         with:
@@ -51,7 +53,7 @@ jobs:
       - name: Build image
         run: docker build -t $DOCKER_IMAGE_NAME .
       - name: Tag image
-        run: docker tag $DOCKER_IMAGE_NAME ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:${{steps.version}} && docker tag $DOCKER_IMAGE_NAME  ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:latest
+        run: docker tag $DOCKER_IMAGE_NAME ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:${{steps.version.version}} && docker tag $DOCKER_IMAGE_NAME  ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:latest
       - name: Push image
-        run: docker push ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:${{steps.version}} && docker push ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:latest
+        run: docker push ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:${{steps.version.version}} && docker push ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:latest
  
