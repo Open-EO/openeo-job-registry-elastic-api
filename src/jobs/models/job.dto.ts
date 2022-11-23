@@ -71,6 +71,12 @@ export class Job {
   })
   job_id: string;
 
+  @IsNotEmpty()
+  @ApiProperty({
+    description: 'ID of the backend that is posting the job',
+  })
+  backend_id: string;
+
   @IsOptional()
   @ApiProperty({
     description: 'ID of the parent job',
