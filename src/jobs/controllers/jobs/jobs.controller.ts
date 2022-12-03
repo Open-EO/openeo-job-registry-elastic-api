@@ -43,7 +43,6 @@ export class JobsController {
     description: 'Query supported by ElasticSearch',
     required: true,
   })
-  @Public()
   async queryJobs(@Body() query: any): Promise<Job[]> {
     try {
       return (await this.databaseService.queryJobs(query)) as Job[];
