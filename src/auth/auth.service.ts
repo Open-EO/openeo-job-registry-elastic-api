@@ -3,9 +3,12 @@ import { ConfigService } from '../config/config/config.service';
 import { AuthType } from './models/authtypes.enum';
 import { BearerGuard } from './bearer/bearer.guard';
 import { Reflector } from '@nestjs/core';
+import { BaseClient } from 'openid-client';
 
 @Injectable()
 export class AuthService {
+  private client: BaseClient;
+
   constructor(private configService: ConfigService) {}
 
   public getAuthGuard(reflector: Reflector) {
@@ -16,5 +19,13 @@ export class AuthService {
       default:
         throw new Error(`Auth guard of type ${type} is not supported!`);
     }
+  }
+
+  public setAuthClient(client: BaseClient) {
+    this.client = client;
+  }
+
+  public getAuthClient(): BaseClient {
+    return this.client;
   }
 }

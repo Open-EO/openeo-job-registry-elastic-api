@@ -7,12 +7,17 @@ import { AuthService } from './auth.service';
 
 const BearerStrategyFactory = {
   provide: 'BearerStrategy',
-  useFactory: async (configService: ConfigService, logger: Logger) => {
+  useFactory: async (
+    configService: ConfigService,
+    logger: Logger,
+    authService: AuthService,
+  ) => {
     const client = await buildBearerClient(configService); // secret sauce! build the dynamic client before injecting it into the strategy for use in the constructor super call.
     const strategy = new BearerStrategy(client, logger);
+    authService.setAuthClient(client);
     return strategy;
   },
-  inject: [ConfigService, Logger],
+  inject: [ConfigService, Logger, AuthService],
 };
 
 @Module({
@@ -28,6 +33,6 @@ const BearerStrategyFactory = {
       inject: [AuthService, Reflector],
     },
   ],
-  exports: [],
+  exports: [AuthService],
 })
 export class AuthModule {}
