@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-http-bearer';
 import { ConfigService } from '../../config/config/config.service';
-import { Client, Issuer } from 'openid-client';
+import { Client, IntrospectionResponse, Issuer } from 'openid-client';
 
 export const buildBearerClient = async (configService: ConfigService) => {
   const issuer = await Issuer.discover(
@@ -29,10 +29,18 @@ export class BearerStrategy extends PassportStrategy(Strategy, 'bearer') {
       verified(`No client available for checking token`, null, null);
     } else {
       try {
-        const { active } = await this.client.introspect(token);
-        if (active) {
+        const response: IntrospectionResponse = await this.client.introspect(
+          token,
+        );
+        if (response.active) {
           verified(null, {}, null);
         } else {
+          this.logger.debug(`Bearer token:`, token, BearerStrategy.name);
+          this.logger.debug(
+            `Introspection response:`,
+            response,
+            BearerStrategy.name,
+          );
           this.logger.warn(`Token is invalid`, BearerStrategy.name);
           verified(null, null, 'token_invalid');
         }

@@ -14,6 +14,13 @@ export const schema: convict.Schema<AppConfig> = {
       env: 'PORT',
       arg: 'port',
     },
+    debug: {
+      doc: 'Enable debug logging',
+      format: 'Boolean',
+      default: false,
+      env: 'DEBUG',
+      arg: 'debug',
+    },
   },
   auth: {
     type: {
