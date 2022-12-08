@@ -1,5 +1,5 @@
 {
-  "name": "openeo-job-tracker-elastic-api",
+  "name": "openeo-job-registry-elastic-api",
   "version": "0.0.0",
   "description": "API to report OpenEO jobs",
   "author": "VITO",
