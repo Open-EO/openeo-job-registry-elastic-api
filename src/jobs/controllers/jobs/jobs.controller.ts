@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  HttpCode,
   InternalServerErrorException,
   Logger,
   NotFoundException,
@@ -34,6 +35,7 @@ export class JobsController {
   }
 
   @Post('/search')
+  @HttpCode(200)
   @ApiOperation({
     tags: ['jobs'],
     summary: 'Search for reported jobs using an ElasticSearch query',
