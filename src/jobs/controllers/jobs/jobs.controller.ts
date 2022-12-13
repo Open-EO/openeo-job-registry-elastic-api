@@ -24,7 +24,7 @@ export class JobsController {
   @Post()
   @ApiOperation({
     tags: ['jobs'],
-    summary: 'Report a jobs and save it to the database',
+    summary: 'Report a job and save it to the database',
   })
   @ApiBody({
     type: Job,
