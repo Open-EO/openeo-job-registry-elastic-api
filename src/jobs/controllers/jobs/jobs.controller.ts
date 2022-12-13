@@ -24,14 +24,15 @@ export class JobsController {
   @Post()
   @ApiOperation({
     tags: ['jobs'],
-    summary: 'Report a list of jobs and save them to the database',
+    summary: 'Report a jobs and save it to the database',
   })
   @ApiBody({
     type: Job,
-    isArray: true,
+    isArray: false,
   })
-  async storeJobs(@Body() jobs: Job[]): Promise<Job[]> {
-    return this.databaseService.saveJobs(jobs);
+  async storeJobs(@Body() job: Job): Promise<Job> {
+    const jobs: Job[] = await this.databaseService.saveJobs([job]);
+    return jobs[0];
   }
 
   @Post('/search')
