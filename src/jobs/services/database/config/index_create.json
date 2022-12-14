@@ -72,12 +72,6 @@
       "dependency_status": {
         "type": "keyword"
       },
-      "memory_time_megabyte_seconds": {
-        "type": "long"
-      },
-      "cpu_time_seconds": {
-        "type": "long"
-      },
       "links": {
         "type": "keyword"
       },
