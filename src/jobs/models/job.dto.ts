@@ -159,22 +159,6 @@ export class Job {
   finished?: string;
 
   @IsOptional()
-  @IsDateString()
-  @ApiProperty({
-    description: 'Start timestamp of the job',
-    required: false,
-  })
-  start_datetime?: string;
-
-  @IsOptional()
-  @IsDateString()
-  @ApiProperty({
-    description: 'Finish timestamp of the job',
-    required: false,
-  })
-  end_datetime?: string;
-
-  @IsOptional()
   @ApiProperty({
     description: 'Title of the job',
     required: false,
@@ -221,32 +205,6 @@ export class Job {
   cpu_time_seconds?: number;
 
   @IsOptional()
-  @ApiProperty({
-    description: 'Geometry processed by the job',
-    required: false,
-  })
-  geometry?: any;
-
-  @IsOptional()
-  @IsArray()
-  @ArrayMinSize(4)
-  @ArrayMaxSize(4)
-  @IsNumber({}, { each: true })
-  @ApiProperty({
-    description: 'Extend processed by the job',
-    required: false,
-  })
-  bbox?: number[];
-
-  @IsOptional()
-  @ValidateNested()
-  @ApiProperty({
-    description: 'Area processed by the job',
-    required: false,
-  })
-  area?: JobArea;
-
-  @IsOptional()
   @IsArray()
   @ApiProperty({
     description: 'Links related to the job',
@@ -260,36 +218,6 @@ export class Job {
     required: false,
   })
   assets?: any;
-
-  @IsOptional()
-  @IsNumber()
-  @ApiProperty({
-    description: 'EPSG code used while executing the job',
-    required: false,
-  })
-  epsg?: number;
-
-  @IsOptional()
-  @IsArray()
-  @ApiProperty({
-    description: 'Instruments used by the job',
-    required: false,
-  })
-  instruments?: string[];
-
-  @IsOptional()
-  @ApiProperty({
-    description: 'Facility where job is executed',
-    required: false,
-  })
-  processing_facility?: string;
-
-  @IsOptional()
-  @ApiProperty({
-    description: 'Software version usede by the job',
-    required: false,
-  })
-  processing_software?: string;
 
   @IsOptional()
   @IsArray()
@@ -312,4 +240,11 @@ export class Job {
     required: false,
   })
   job_options?: any;
+
+  @IsOptional()
+  @ApiProperty({
+    description: 'Metadata about the batch job results and assets',
+    required: false,
+  })
+  results_metadata?: any;
 }

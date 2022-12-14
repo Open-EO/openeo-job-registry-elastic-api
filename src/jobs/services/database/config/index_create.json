@@ -46,12 +46,6 @@
       "finished": {
         "type": "date"
       },
-      "start_datetime": {
-        "type": "date"
-      },
-      "end_datetime": {
-        "type": "date"
-      },
       "title": {
         "type": "text"
       },
@@ -84,40 +78,11 @@
       "cpu_time_seconds": {
         "type": "long"
       },
-      "geometry": {
-        "type": "object"
-      },
-      "bbox": {
-        "type": "double"
-      },
-      "area": {
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "double"
-          },
-          "unit": {
-            "type": "keyword"
-          }
-        }
-      },
       "links": {
         "type": "keyword"
       },
       "assets": {
         "type": "object"
-      },
-      "epsg": {
-        "type": "integer"
-      },
-      "instruments": {
-        "type": "keyword"
-      },
-      "processing_facility": {
-        "type": "keyword"
-      },
-      "processing_software": {
-        "type": "keyword"
       },
       "unique_service_ids": {
         "type": "keyword"
@@ -126,6 +91,9 @@
         "type": "object"
       },
       "job_options": {
+        "type": "object"
+      },
+      "results_metadata": {
         "type": "object"
       }
     }
