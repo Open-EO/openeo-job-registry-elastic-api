@@ -205,22 +205,6 @@ export class Job {
   dependency_status?: string;
 
   @IsOptional()
-  @IsPositive()
-  @ApiProperty({
-    description: 'Memory time in MB/s used by the job',
-    required: false,
-  })
-  memory_time_megabyte_seconds?: number;
-
-  @IsOptional()
-  @IsPositive()
-  @ApiProperty({
-    description: 'CPU time in seconds used by the job',
-    required: false,
-  })
-  cpu_time_seconds?: number;
-
-  @IsOptional()
   @ApiProperty({
     description: 'Geometry processed by the job',
     required: false,
