@@ -17,21 +17,6 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-export class JobArea {
-  @IsPositive()
-  @IsNotEmpty()
-  @ApiProperty({
-    description: 'Value of the area processed',
-  })
-  value: number;
-
-  @IsNotEmpty()
-  @ApiProperty({
-    description: 'Unit of the area processed',
-  })
-  unit: string;
-}
-
 export class JobDependency {
   @IsOptional()
   @ApiProperty({
