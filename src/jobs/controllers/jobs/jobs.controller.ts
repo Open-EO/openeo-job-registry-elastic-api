@@ -64,7 +64,7 @@ export class JobsController {
     summary: 'Update the information of an existing job',
   })
   @ApiBody({
-    type: Job,
+    type: PatchJob,
     required: true,
   })
   async patchJob(
