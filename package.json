@@ -54,6 +54,8 @@
     "@nestjs/cli": "^9.1.5",
     "@nestjs/schematics": "^9.0.3",
     "@nestjs/testing": "^9.1.6",
+    "@semantic-release/github": "^8.0.7",
+    "@semantic-release/release-notes-generator": "^10.0.3",
     "@types/express": "^4.17.13",
     "@types/express-session": "^1.17.5",
     "@types/jest": "27.0.2",
