@@ -216,5 +216,5 @@ export class Job extends PatchJob {
   @ApiProperty({
     description: 'ID of the user who owns the job',
   })
-  user_id?: string;
+  user_id: string;
 }
