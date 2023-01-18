@@ -29,6 +29,9 @@ const bootstrap = async () => {
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
+      whitelist: true,
+      forbidUnknownValues: true,
+      forbidNonWhitelisted: true,
     }),
   );
   await app.listen(configService.get('general.port'));

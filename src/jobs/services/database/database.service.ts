@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
-import { Job } from '../../models/job.dto';
+import { Job, PatchJob } from '../../models/job.dto';
 import { ConfigService } from '../../../config/config/config.service';
 
 @Injectable()
@@ -88,7 +88,7 @@ export class DatabaseService {
    * @param docId - ID of the ElasticSearch document to update
    * @param update - Partial update that should be applied
    */
-  async patchJob(docId: string, update: Job): Promise<Job> {
+  async patchJob(docId: string, update: PatchJob): Promise<Job> {
     await this.elasticSearch.update({
       index: this.JOBS_INDEX,
       id: docId,

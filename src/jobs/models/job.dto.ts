@@ -49,33 +49,7 @@ export class JobDependency {
   card4l?: boolean;
 }
 
-export class Job {
-  @IsNotEmpty()
-  @ApiProperty({
-    description: 'ID of the job',
-  })
-  job_id: string;
-
-  @IsNotEmpty()
-  @ApiProperty({
-    description: 'ID of the backend that is posting the job',
-  })
-  backend_id: string;
-
-  @IsOptional()
-  @ApiProperty({
-    description: 'ID of the parent job',
-    required: false,
-  })
-  parent_id?: string;
-
-  @IsOptional()
-  @ApiProperty({
-    description: 'ID of the user who executed the job',
-    required: false,
-  })
-  user_id?: string;
-
+export class PatchJob {
   @IsOptional()
   @ApiProperty({
     description: 'Proxy user used to execute the job',
@@ -216,4 +190,32 @@ export class Job {
     required: false,
   })
   results_metadata?: any;
+}
+
+export class Job extends PatchJob {
+  @IsNotEmpty()
+  @ApiProperty({
+    description: 'ID of the job',
+  })
+  job_id: string;
+
+  @IsNotEmpty()
+  @ApiProperty({
+    description: 'ID of the backend that is posting the job',
+  })
+  backend_id: string;
+
+  @IsOptional()
+  @ApiProperty({
+    description: 'ID of the parent job',
+    required: false,
+  })
+  parent_id?: string;
+
+  @IsOptional()
+  @ApiProperty({
+    description: 'ID of the user who executed the job',
+    required: false,
+  })
+  user_id?: string;
 }

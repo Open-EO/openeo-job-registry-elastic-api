@@ -6,11 +6,12 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  Param,
   Patch,
   Post,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation } from '@nestjs/swagger';
-import { Job } from '../../models/job.dto';
+import { Job, PatchJob } from '../../models/job.dto';
 import { DatabaseService } from '../../services/database/database.service';
 import { Public } from '../../../auth/decorators/public.decorator';
 
@@ -57,7 +58,7 @@ export class JobsController {
     }
   }
 
-  @Patch()
+  @Patch('/:id')
   @ApiOperation({
     tags: ['jobs'],
     summary: 'Update the information of an existing job',
@@ -66,14 +67,14 @@ export class JobsController {
     type: Job,
     required: true,
   })
-  async patchJob(@Body() update: Job): Promise<Job> {
-    if (!update.job_id) {
-      throw new BadRequestException(`No job_id specified in body`);
-    }
+  async patchJob(
+    @Param('id') jobId: string,
+    @Body() update: PatchJob,
+  ): Promise<Job> {
     // Check if the job to update exists in the database
-    const jobID: string = await this.databaseService.getJobDocId(update.job_id);
+    const jobID: string = await this.databaseService.getJobDocId(jobId);
     if (!jobID) {
-      throw new NotFoundException(`Could not find job with ${update.job_id}`);
+      throw new NotFoundException(`Could not find job with ${jobId}`);
     }
 
     // Partially update the document
