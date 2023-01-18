@@ -41,7 +41,7 @@ jobs:
       - run: npm install
       - run: npm run release
         env:
-            github_token: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - id: version
         run: |
           version=$(npm pkg get version | tr -d '"')
