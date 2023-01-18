@@ -198,12 +198,11 @@ export class Job extends PatchJob {
   })
   parent_id?: string;
 
-  @IsOptional()
+  @IsNotEmpty()
   @ApiProperty({
-    description: 'ID of the user who executed the job',
-    required: false,
+    description: 'ID of the user who owns the job',
   })
-  user_id?: string;
+  user_id: string;
 
   @IsOptional()
   @ApiProperty({
