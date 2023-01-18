@@ -73,13 +73,6 @@ export class PatchJob {
 
   @IsOptional()
   @ApiProperty({
-    description: 'Processing graph used by the job',
-    required: false,
-  })
-  specification?: any;
-
-  @IsOptional()
-  @ApiProperty({
     description: 'ID of the application linked to the job',
     required: false,
   })
@@ -179,13 +172,6 @@ export class PatchJob {
 
   @IsOptional()
   @ApiProperty({
-    description: 'User specified options related to the job execution',
-    required: false,
-  })
-  job_options?: any;
-
-  @IsOptional()
-  @ApiProperty({
     description: 'Metadata about the batch job results and assets',
     required: false,
   })
@@ -217,4 +203,18 @@ export class Job extends PatchJob {
     description: 'ID of the user who owns the job',
   })
   user_id: string;
+
+  @IsOptional()
+  @ApiProperty({
+    description: 'Process graph of the job',
+    required: false,
+  })
+  process?: any;
+
+  @IsOptional()
+  @ApiProperty({
+    description: 'User specified options related to the job execution',
+    required: false,
+  })
+  job_options?: any;
 }
