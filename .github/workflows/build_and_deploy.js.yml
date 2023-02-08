@@ -75,8 +75,5 @@ jobs:
       - name: Tag image
         run: docker tag $DOCKER_IMAGE_NAME ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:${{needs.release.outputs.docker_version}} && docker tag $DOCKER_IMAGE_NAME  ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:latest
       - name: Push image
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
         run: docker push ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:${{needs.release.outputs.docker_version}} && docker push ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:latest
 
