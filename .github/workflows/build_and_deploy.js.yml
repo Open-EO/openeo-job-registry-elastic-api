@@ -62,6 +62,10 @@ jobs:
           node-version: 18.x
           cache: 'npm'
       - run: npm install
+      - name: Update package.json
+        id: version
+        run: |
+          npm version ${{needs.release.outputs.docker_version}}
       - name: Login to Docker repository
         uses: docker/login-action@v2
         with:
