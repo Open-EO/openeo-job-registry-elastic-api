@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
 import { Job, PatchJob } from '../../models/job.dto';
 import { ConfigService } from '../../../config/config/config.service';
+import { UtilsService } from '../../../utils/services/utils/utils.service';
 
 @Injectable()
 export class DatabaseService {
@@ -108,12 +109,23 @@ export class DatabaseService {
    * @param jobId - Job ID to search for
    */
   async getJobDocId(jobId: string): Promise<string> {
-    const ids: string[] = (await this.queryJobs(
-      this.getJobQuery(jobId),
-      1,
-      true,
-    )) as string[];
-    return ids.length > 0 ? ids[0] : undefined;
+    let retries = 1;
+    let id;
+    while (retries <= 5) {
+      const ids: string[] = (await this.queryJobs(
+        this.getJobQuery(jobId),
+        1,
+        true,
+      )) as string[];
+      id = ids.length > 0 ? ids[0] : undefined;
+      if (id) {
+        return id;
+      } else {
+        await UtilsService.sleep(500);
+        retries++;
+      }
+    }
+    return undefined;
   }
 
   /**
