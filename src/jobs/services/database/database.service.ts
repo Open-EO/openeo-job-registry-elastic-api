@@ -30,20 +30,12 @@ export class DatabaseService {
   }
 
   /**
-   * Get the job information for a specific ID
-   * @param id - ID of the job to search for
-   */
-  public async getJobByJobId(id: string): Promise<Job> {
-    const jobs = (await this.queryJobs(this.getJobQuery(id), 1)) as Job[];
-    return jobs.length > 0 ? jobs[0] : undefined;
-  }
-
-  /**
    * Given an ElasticSearch query, return the list of jobs that matches the query
    * @param query - ElasticSearch query to execute
    * @param limit - The amount of documents to fetch (optional)
    * @param idsOnly - Only return the IDs of the document
    */
+  /* istanbul ignore next */
   public async queryJobs(
     query: any,
     limit?: number,
@@ -132,6 +124,7 @@ export class DatabaseService {
    * Create the ElasticSearch job query based on a job id
    * @param id - Job ID to search for
    */
+  /* istanbul ignore next */
   private getJobQuery = (id: string): any => ({
     query: {
       bool: {

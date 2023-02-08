@@ -3,7 +3,7 @@ import { ConfigModule } from '../config/config.module';
 import { APP_GUARD, Reflector } from '@nestjs/core';
 import { ConfigService } from '../config/config/config.service';
 import { BearerStrategy, buildBearerClient } from './bearer/bearer.strategy';
-import { AuthService } from './auth.service';
+import { AuthService } from './services/auth.service';
 
 const BearerStrategyFactory = {
   provide: 'BearerStrategy',

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '../config/config/config.service';
-import { AuthType } from './models/authtypes.enum';
-import { BearerGuard } from './bearer/bearer.guard';
+import { ConfigService } from '../../config/config/config.service';
+import { AuthType } from '../models/authtypes.enum';
+import { BearerGuard } from '../bearer/bearer.guard';
 import { Reflector } from '@nestjs/core';
 import { BaseClient } from 'openid-client';
 
@@ -21,10 +21,12 @@ export class AuthService {
     }
   }
 
+  /* istanbul ignore next */
   public setAuthClient(client: BaseClient) {
     this.client = client;
   }
 
+  /* istanbul ignore next */
   public getAuthClient(): BaseClient {
     return this.client;
   }

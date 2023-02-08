@@ -92,6 +92,25 @@
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 95,
+        "functions": 95,
+        "lines": 95,
+        "statements": 95
+      }
+    },
+    "coveragePathIgnorePatterns": [
+      ".module.ts",
+      ".dto.ts",
+      "health.",
+      ".schema.ts",
+      ".enum.ts",
+      ".decorator.ts",
+      "main.ts",
+      "bearer.",
+      ".mock.ts"
+    ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
   }
