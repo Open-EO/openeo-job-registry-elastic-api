@@ -4,6 +4,7 @@ import { ConfigService } from './config/config/config.service';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { version } from '../package.json';
 import { ValidationPipe } from '@nestjs/common';
+import { json, urlencoded } from 'express';
 
 const setupDocs = (app) => {
   const config = new DocumentBuilder()
@@ -21,6 +22,8 @@ const bootstrap = async () => {
   const app = await NestFactory.create(AppModule);
   const configService: ConfigService = app.get(ConfigService);
   setupDocs(app);
+  app.use(json({ limit: '5mb' }));
+  app.use(urlencoded({ extended: true, limit: '5mb' }));
   app.useLogger(
     configService.get('general.debug')
       ? ['log', 'error', 'warn', 'debug', 'verbose']
