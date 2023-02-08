@@ -1,7 +1,7 @@
 import { HealthIndicator, HealthIndicatorResult } from '@nestjs/terminus';
 import { Headers, Injectable } from '@nestjs/common';
 import { BearerStrategy } from '../../auth/bearer/bearer.strategy';
-import { AuthService } from '../../auth/auth.service';
+import { AuthService } from '../../auth/services/auth.service';
 
 enum TokenStatus {
   MISSING = 'missing',

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
 import { Job, PatchJob } from '../../models/job.dto';
 import { ConfigService } from '../../../config/config/config.service';
+import { UtilsService } from '../../../utils/services/utils/utils.service';
 
 @Injectable()
 export class DatabaseService {
@@ -29,20 +30,12 @@ export class DatabaseService {
   }
 
   /**
-   * Get the job information for a specific ID
-   * @param id - ID of the job to search for
-   */
-  public async getJobByJobId(id: string): Promise<Job> {
-    const jobs = (await this.queryJobs(this.getJobQuery(id), 1)) as Job[];
-    return jobs.length > 0 ? jobs[0] : undefined;
-  }
-
-  /**
    * Given an ElasticSearch query, return the list of jobs that matches the query
    * @param query - ElasticSearch query to execute
    * @param limit - The amount of documents to fetch (optional)
    * @param idsOnly - Only return the IDs of the document
    */
+  /* istanbul ignore next */
   public async queryJobs(
     query: any,
     limit?: number,
@@ -108,18 +101,30 @@ export class DatabaseService {
    * @param jobId - Job ID to search for
    */
   async getJobDocId(jobId: string): Promise<string> {
-    const ids: string[] = (await this.queryJobs(
-      this.getJobQuery(jobId),
-      1,
-      true,
-    )) as string[];
-    return ids.length > 0 ? ids[0] : undefined;
+    let retries = 1;
+    let id;
+    while (retries <= 5) {
+      const ids: string[] = (await this.queryJobs(
+        this.getJobQuery(jobId),
+        1,
+        true,
+      )) as string[];
+      id = ids.length > 0 ? ids[0] : undefined;
+      if (id) {
+        return id;
+      } else {
+        await UtilsService.sleep(500);
+        retries++;
+      }
+    }
+    return undefined;
   }
 
   /**
    * Create the ElasticSearch job query based on a job id
    * @param id - Job ID to search for
    */
+  /* istanbul ignore next */
   private getJobQuery = (id: string): any => ({
     query: {
       bool: {
