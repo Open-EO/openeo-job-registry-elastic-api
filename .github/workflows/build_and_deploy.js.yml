@@ -64,7 +64,7 @@ jobs:
       - name: Update package.json
         id: version
         run: |
-          sed -i "s/v_sem_rel/${{needs.release.outputs.docker_version}}/g" package.json
+          sed -i "s/0.0.0-semver/${{needs.release.outputs.docker_version}}/g" package.json
       - run: npm install
       - name: Login to Docker repository
         uses: docker/login-action@v2

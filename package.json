@@ -1,6 +1,6 @@
 {
   "name": "openeo-job-registry-elastic-api",
-  "version": "v_sem_rel",
+  "version": "0.0.0-semver",
   "description": "API to report OpenEO jobs",
   "author": "VITO",
   "private": false,
