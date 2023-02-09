@@ -1,7 +1,7 @@
 import {
-  BadRequestException,
   Body,
   Controller,
+  Delete,
   HttpCode,
   InternalServerErrorException,
   Logger,
@@ -13,7 +13,6 @@ import {
 import { ApiBody, ApiOperation } from '@nestjs/swagger';
 import { Job, PatchJob } from '../../models/job.dto';
 import { DatabaseService } from '../../services/database/database.service';
-import { Public } from '../../../auth/decorators/public.decorator';
 
 @Controller('jobs')
 export class JobsController {
@@ -72,12 +71,37 @@ export class JobsController {
     @Body() update: PatchJob,
   ): Promise<Job> {
     // Check if the job to update exists in the database
-    const jobID: string = await this.databaseService.getJobDocId(jobId);
-    if (!jobID) {
-      throw new NotFoundException(`Could not find job with ${jobId}`);
-    }
+    const jobID: string = await this.checkIfJobExists(jobId);
 
     // Partially update the document
     return this.databaseService.patchJob(jobID, update);
+  }
+
+  @Delete('/:id')
+  @ApiOperation({
+    tags: ['jobs'],
+    summary: 'Mark a document as deleted',
+  })
+  async deleteJob(@Param('id') jobId: string): Promise<void> {
+    // Check if the job to update exists in the database
+    const jobID: string = await this.checkIfJobExists(jobId);
+
+    // Partially update the document
+    await this.databaseService.patchJob(jobID, {
+      deleted: true,
+    });
+  }
+
+  /**
+   * Helper function to verify if job exists in the database. If not, throw an exception
+   * @param id - ID of the job to check
+   * @private
+   */
+  private async checkIfJobExists(id: string) {
+    const jobID: string = await this.databaseService.getJobDocId(id);
+    if (!jobID) {
+      throw new NotFoundException(`Could not find job with ${id}`);
+    }
+    return jobID;
   }
 }
