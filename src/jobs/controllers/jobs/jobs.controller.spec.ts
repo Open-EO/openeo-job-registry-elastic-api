@@ -95,4 +95,34 @@ describe('JobsController', () => {
     expect(dbJob).toBeCalledTimes(1);
     expect(dbPatch).toBeCalledTimes(0);
   });
+
+  it('should update the deleted flag of a job when receiving a delete request', async () => {
+    const dbJob = jest
+      .spyOn(databaseService, 'getJobDocId')
+      .mockResolvedValueOnce(JOB.job_id);
+    const dbPatch = jest
+      .spyOn(databaseService, 'patchJob')
+      .mockResolvedValueOnce(JOB);
+
+    await controller.deleteJob(JOB.job_id);
+
+    expect(dbJob).toBeCalledTimes(1);
+    expect(dbPatch).toBeCalledTimes(1);
+    expect(dbPatch).toBeCalledWith(JOB.job_id, {
+      deleted: true,
+    });
+  });
+
+  it('should throw an error when document does not exists when deleting it', async () => {
+    const dbJob = jest
+      .spyOn(databaseService, 'getJobDocId')
+      .mockResolvedValueOnce(undefined);
+    const dbPatch = jest
+      .spyOn(databaseService, 'patchJob')
+      .mockResolvedValueOnce(JOB);
+
+    await expect(controller.deleteJob(JOB.job_id)).rejects.toThrowError();
+    expect(dbJob).toBeCalledTimes(1);
+    expect(dbPatch).toBeCalledTimes(0);
+  });
 });

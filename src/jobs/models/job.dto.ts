@@ -1,19 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
-  ArrayMaxSize,
-  ArrayMinSize,
   IsArray,
   IsBoolean,
-  IsDate,
   IsDateString,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
-  IsPositive,
-  MaxLength,
-  MinLength,
-  minLength,
-  Validate,
   ValidateNested,
 } from 'class-validator';
 
@@ -176,6 +167,10 @@ export class PatchJob {
     required: false,
   })
   results_metadata?: any;
+}
+
+export class ExtendedPatchJob extends PatchJob {
+  deleted?: boolean;
 }
 
 export class Job extends PatchJob {

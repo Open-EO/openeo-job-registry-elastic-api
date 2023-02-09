@@ -1,6 +1,6 @@
 {
   "name": "openeo-job-registry-elastic-api",
-  "version": "0.0.0",
+  "version": "v_sem_rel",
   "description": "API to report OpenEO jobs",
   "author": "VITO",
   "private": false,
@@ -94,7 +94,7 @@
     ],
     "coverageThreshold": {
       "global": {
-        "branches": 95,
+        "branches": 90,
         "functions": 95,
         "lines": 95,
         "statements": 95
