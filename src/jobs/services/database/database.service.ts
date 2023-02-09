@@ -32,12 +32,14 @@ export class DatabaseService {
   /**
    * Given an ElasticSearch query, return the list of jobs that matches the query
    * @param query - ElasticSearch query to execute
+   * @param deleted - Flag indicating if the deleted docs should be included (true) or not (false)
    * @param limit - The amount of documents to fetch (optional)
    * @param idsOnly - Only return the IDs of the document
    */
   /* istanbul ignore next */
   public async queryJobs(
     query: any,
+    deleted?: boolean,
     limit?: number,
     idsOnly?: boolean,
   ): Promise<Job[] | string[]> {
@@ -46,6 +48,10 @@ export class DatabaseService {
 
     if (Object.keys(query).length === 0) {
       throw new Error(`empty query`);
+    }
+
+    if (!deleted) {
+      query = this.addDeletedFilter(query);
     }
     // Perform initial search
     const results = await this.elasticSearch.search({
@@ -106,6 +112,7 @@ export class DatabaseService {
     while (retries <= 5) {
       const ids: string[] = (await this.queryJobs(
         this.getJobQuery(jobId),
+        false,
         1,
         true,
       )) as string[];
@@ -118,6 +125,30 @@ export class DatabaseService {
       }
     }
     return undefined;
+  }
+
+  /**
+   * Adds a filter to the request body to filter out the docs that are marked for deletion
+   * @param body - Body that is sent to ES
+   */
+  addDeletedFilter(body: any): any {
+    return {
+      ...body,
+      query: {
+        ...body?.query,
+        bool: {
+          ...body?.query?.bool,
+          must_not: [
+            ...(body?.query?.bool?.must_not || []),
+            {
+              term: {
+                deleted: 'true',
+              },
+            },
+          ],
+        },
+      },
+    };
   }
 
   /**

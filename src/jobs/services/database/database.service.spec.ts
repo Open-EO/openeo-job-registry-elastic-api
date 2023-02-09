@@ -8,6 +8,7 @@ import { ConfigModule } from '../../../config/config.module';
 import { ConfigService } from '../../../config/config/config.service';
 import { JOB } from '../../mocks/job.mock';
 import { TransportRequestCallback } from '@elastic/elasticsearch/lib/Transport';
+import { QUERIES } from '../../mocks/query.mock';
 
 describe('DatabaseService', () => {
   let service: DatabaseService;
@@ -82,5 +83,51 @@ describe('DatabaseService', () => {
     const id = await service.getJobDocId('foobar');
     expect(getJobID).toBeCalledTimes(5);
     expect(id).toBeUndefined();
+  });
+
+  it('should add the deleted filter by default when querying jobs', async () => {
+    jest.spyOn(esService, 'search').mockReturnValueOnce({
+      body: {
+        hits: {
+          hits: [],
+          total: {
+            value: 0,
+          },
+        },
+      },
+    } as any);
+    const deletedFilter = jest
+      .spyOn(service, 'addDeletedFilter')
+      .mockReturnValueOnce(QUERIES[1].input);
+
+    await service.queryJobs(QUERIES[1].input);
+    expect(deletedFilter).toBeCalledTimes(1);
+  });
+
+  it('should not add the deleted filter when querying jobs and deleted flag is set to true', async () => {
+    jest.spyOn(esService, 'search').mockReturnValueOnce({
+      body: {
+        hits: {
+          hits: [],
+          total: {
+            value: 0,
+          },
+        },
+      },
+    } as any);
+    const deletedFilter = jest
+      .spyOn(service, 'addDeletedFilter')
+      .mockReturnValueOnce(QUERIES[1].input);
+
+    await service.queryJobs(QUERIES[1].input, true);
+    expect(deletedFilter).toBeCalledTimes(0);
+  });
+  it('should correctly update the query to filter out deleted documents', async () => {
+    let count = 1;
+    for (const query of QUERIES) {
+      console.log(`Testing query ${count}`);
+      expect(service.addDeletedFilter(query.input)).toEqual(query.output);
+      count++;
+    }
   });
 });
