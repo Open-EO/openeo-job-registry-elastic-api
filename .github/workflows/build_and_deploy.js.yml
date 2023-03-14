@@ -8,6 +8,8 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
+    branches: [ "main" ]
 env:
   DOCKER_IMAGE_NAME: openeo-job-registry-elastic-api
 jobs:
