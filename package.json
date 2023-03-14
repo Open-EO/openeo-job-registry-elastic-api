@@ -109,7 +109,8 @@
       ".decorator.ts",
       "main.ts",
       "bearer.",
-      ".mock.ts"
+      ".mock.ts",
+      ".middleware.ts"
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
