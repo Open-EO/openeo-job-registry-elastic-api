@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
 import { ExtendedPatchJob, Job } from '../../models/job.dto';
 import { ConfigService } from '../../../config/config/config.service';
 import { UtilsService } from '../../../utils/services/utils/utils.service';
+import { ApiResponse } from '@elastic/elasticsearch';
 
 @Injectable()
 export class DatabaseService {
@@ -11,6 +12,7 @@ export class DatabaseService {
   constructor(
     private configService: ConfigService,
     private elasticSearch: ElasticsearchService,
+    private logger: Logger,
   ) {
     this.JOBS_INDEX = this.configService.get('database.jobsIdx');
   }
@@ -23,9 +25,32 @@ export class DatabaseService {
     const body = [].concat(
       ...jobs.map((j: Job) => [{ index: { _index: this.JOBS_INDEX } }, j]),
     );
-    await this.elasticSearch.bulk({
-      body,
-    });
+    const response: ApiResponse<Record<string, any>> =
+      await this.elasticSearch.bulk({
+        body,
+      });
+
+    if (response.statusCode !== 200) {
+      this.logger.error(
+        'Could not save jobs to elasticsearch',
+        JSON.stringify(response.body),
+      );
+      throw new HttpException(
+        'Could not store jobs as general call to database failed',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    } else if (this.hasBulkErrors(response.body)) {
+      const errors = this.getBulkErrors(response.body);
+      this.logger.error(
+        'Could not save jobs to elasticsearch',
+        JSON.stringify(errors),
+      );
+      throw new HttpException(
+        'Could not store all jobs: ' + JSON.stringify(errors),
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
     return jobs;
   }
 
@@ -169,4 +194,29 @@ export class DatabaseService {
       },
     },
   });
+
+  /**
+   * Check if the bulk response of the ES contains an error for one of the items
+   * @param body - ES response body
+   * @private
+   */
+  private hasBulkErrors(body: Record<string, any>) {
+    return this.getBulkErrors(body).length > 0;
+  }
+
+  /**
+   * Extract the errors from the ES response body
+   * @param body - ES response body
+   * @private
+   */
+  private getBulkErrors(
+    body: Record<string, any>,
+  ): { idx: number; error: any }[] {
+    return (body.items || [])
+      .map((i, idx) => ({
+        idx,
+        error: i.index?.error?.reason,
+      }))
+      .filter((i) => !!i.error);
+  }
 }

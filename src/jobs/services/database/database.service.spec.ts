@@ -9,6 +9,7 @@ import { ConfigService } from '../../../config/config/config.service';
 import { JOB } from '../../mocks/job.mock';
 import { TransportRequestCallback } from '@elastic/elasticsearch/lib/Transport';
 import { QUERIES } from '../../mocks/query.mock';
+import { Logger } from '@nestjs/common';
 
 describe('DatabaseService', () => {
   let service: DatabaseService;
@@ -29,7 +30,7 @@ describe('DatabaseService', () => {
           inject: [ConfigService],
         }),
       ],
-      providers: [DatabaseService],
+      providers: [DatabaseService, Logger],
     }).compile();
 
     service = module.get<DatabaseService>(DatabaseService);
@@ -46,8 +47,51 @@ describe('DatabaseService', () => {
   });
 
   it('should save jobs in bulk', async () => {
-    const es = jest.spyOn(esService, 'bulk').mockReturnValueOnce(undefined);
+    const es = jest.spyOn(esService, 'bulk').mockReturnValueOnce({
+      statusCode: 200,
+      body: {
+        items: [
+          {
+            id: 1,
+          },
+          {
+            id: 2,
+          },
+        ],
+      },
+    } as any);
     expect(await service.saveJobs([JOB])).toEqual([JOB]);
+    expect(es).toBeCalledTimes(1);
+  });
+
+  it('should throw an error if the bulk request fails', async () => {
+    const es = jest.spyOn(esService, 'bulk').mockReturnValueOnce({
+      statusCode: 400,
+    } as any);
+    await expect(service.saveJobs([JOB])).rejects.toThrowError();
+    expect(es).toBeCalledTimes(1);
+  });
+
+  it('should throw an error if one of the bulk request fails', async () => {
+    const es = jest.spyOn(esService, 'bulk').mockReturnValueOnce({
+      statusCode: 200,
+      body: {
+        items: [
+          {
+            id: 1,
+          },
+          {
+            id: 2,
+            index: {
+              error: {
+                reason: 'Mistakes were made!',
+              },
+            },
+          },
+        ],
+      },
+    } as any);
+    await expect(service.saveJobs([JOB])).rejects.toThrowError();
     expect(es).toBeCalledTimes(1);
   });
 
