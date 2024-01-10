@@ -167,6 +167,13 @@ export class PatchJob {
     required: false,
   })
   results_metadata?: any;
+
+  @IsOptional()
+  @ApiProperty({
+    description: 'Total cost of the job',
+    required: false,
+  })
+  costs?: number;
 }
 
 export class ExtendedPatchJob extends PatchJob {
