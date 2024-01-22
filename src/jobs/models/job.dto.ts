@@ -7,6 +7,7 @@ import {
   IsOptional,
   ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class JobDependency {
   @IsOptional()
@@ -117,6 +118,7 @@ export class PatchJob {
 
   @IsOptional()
   @ValidateNested({ each: true })
+  @Type(() => JobDependency)
   @IsArray()
   @ApiProperty({
     description: 'List of the dependencies of the job',
