@@ -68,6 +68,39 @@ export class DatabaseService {
     limit?: number,
     idsOnly?: boolean,
   ): Promise<Job[] | string[]> {
+    let retries = 1;
+
+    while (retries <= 5) {
+      const results = await this.executeJobQuery(
+        query,
+        deleted,
+        limit,
+        idsOnly,
+      );
+
+      if (results.length > 0) {
+        return results;
+      } else {
+        await UtilsService.sleep(500);
+        retries++;
+      }
+    }
+    return [];
+  }
+  /**
+   * Execute a query on the jobs index.
+   * @param query - ElasticSearch query to execute
+   * @param deleted - Flag indicating if the deleted docs should be included (true) or not (false)
+   * @param limit - The amount of documents to fetch (optional)
+   * @param idsOnly - Only return the IDs of the document
+   */
+  /* istanbul ignore next */
+  public async executeJobQuery(
+    query: any,
+    deleted?: boolean,
+    limit?: number,
+    idsOnly?: boolean,
+  ): Promise<Job[] | string[]> {
     const queue = [];
     let jobs: Job[] = [];
 
@@ -132,24 +165,13 @@ export class DatabaseService {
    * @param jobId - Job ID to search for
    */
   async getJobDocId(jobId: string): Promise<string> {
-    let retries = 1;
-    let id;
-    while (retries <= 5) {
-      const ids: string[] = (await this.queryJobs(
-        this.getJobQuery(jobId),
-        false,
-        1,
-        true,
-      )) as string[];
-      id = ids.length > 0 ? ids[0] : undefined;
-      if (id) {
-        return id;
-      } else {
-        await UtilsService.sleep(500);
-        retries++;
-      }
-    }
-    return undefined;
+    const ids: string[] = (await this.queryJobs(
+      this.getJobQuery(jobId),
+      false,
+      1,
+      true,
+    )) as string[];
+    return ids.length > 0 ? ids[0] : undefined;
   }
 
   /**

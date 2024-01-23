@@ -122,7 +122,9 @@ describe('DatabaseService', () => {
   });
 
   it('should retry getting the job ID if the request failed', async () => {
-    const getJobID = jest.spyOn(service, 'queryJobs').mockResolvedValue([]);
+    const getJobID = jest
+      .spyOn(service, 'executeJobQuery')
+      .mockResolvedValue([]);
 
     const id = await service.getJobDocId('foobar');
     expect(getJobID).toBeCalledTimes(5);
@@ -130,7 +132,7 @@ describe('DatabaseService', () => {
   });
 
   it('should add the deleted filter by default when querying jobs', async () => {
-    jest.spyOn(esService, 'search').mockReturnValueOnce({
+    jest.spyOn(esService, 'search').mockReturnValue({
       body: {
         hits: {
           hits: [],
@@ -145,11 +147,11 @@ describe('DatabaseService', () => {
       .mockReturnValueOnce(QUERIES[1].input);
 
     await service.queryJobs(QUERIES[1].input);
-    expect(deletedFilter).toBeCalledTimes(1);
+    expect(deletedFilter).toBeCalledTimes(5);
   });
 
   it('should not add the deleted filter when querying jobs and deleted flag is set to true', async () => {
-    jest.spyOn(esService, 'search').mockReturnValueOnce({
+    jest.spyOn(esService, 'search').mockReturnValue({
       body: {
         hits: {
           hits: [],
