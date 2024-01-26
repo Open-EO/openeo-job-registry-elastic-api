@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-http-bearer';
 import { ConfigService } from '../../config/config/config.service';
-import { Client, IntrospectionResponse, Issuer } from 'openid-client';
+import { Client, custom, IntrospectionResponse, Issuer } from 'openid-client';
 
 export const buildBearerClient = async (configService: ConfigService) => {
   const issuer = await Issuer.discover(
@@ -11,6 +11,11 @@ export const buildBearerClient = async (configService: ConfigService) => {
   const client = new issuer.Client({
     client_id: configService.get('auth.oidc.clientId'),
     client_secret: configService.get('auth.oidc.clientSecret'),
+  });
+  client[custom.http_options] = (options: any) => ({
+    ...options,
+    timeout: 5000,
+    retry: 2,
   });
   return client;
 };
