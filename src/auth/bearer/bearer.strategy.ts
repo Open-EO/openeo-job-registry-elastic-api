@@ -46,8 +46,7 @@ export class BearerStrategy extends PassportStrategy(Strategy, 'bearer') {
         }
       } catch (e) {
         this.logger.error(
-          `An error occurred while verifying token ${token}`,
-          e,
+          `An error occurred while verifying token ${token}: ${e}`,
           BearerStrategy.name,
         );
       }
