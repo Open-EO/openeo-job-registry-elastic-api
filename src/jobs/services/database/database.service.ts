@@ -203,29 +203,4 @@ export class DatabaseService {
       },
     },
   });
-
-  /**
-   * Check if the bulk response of the ES contains an error for one of the items
-   * @param body - ES response body
-   * @private
-   */
-  private hasBulkErrors(body: Record<string, any>) {
-    return this.getBulkErrors(body).length > 0;
-  }
-
-  /**
-   * Extract the errors from the ES response body
-   * @param body - ES response body
-   * @private
-   */
-  private getBulkErrors(
-    body: Record<string, any>,
-  ): { idx: number; error: any }[] {
-    return (body.items || [])
-      .map((i, idx) => ({
-        idx,
-        error: i.index?.error?.reason,
-      }))
-      .filter((i) => !!i.error);
-  }
 }
