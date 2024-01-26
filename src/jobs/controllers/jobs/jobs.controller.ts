@@ -31,8 +31,7 @@ export class JobsController {
     isArray: false,
   })
   async storeJobs(@Body() job: Job): Promise<Job> {
-    const jobs: Job[] = await this.databaseService.saveJobs([job]);
-    return jobs[0];
+    return await this.databaseService.saveJobs(job);
   }
 
   @Post('/search')

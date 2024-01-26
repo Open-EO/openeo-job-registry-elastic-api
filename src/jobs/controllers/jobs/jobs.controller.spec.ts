@@ -46,7 +46,7 @@ describe('JobsController', () => {
   it('should store jobs in the database', async () => {
     const db = jest
       .spyOn(databaseService, 'saveJobs')
-      .mockResolvedValueOnce([JOB]);
+      .mockResolvedValueOnce(JOB);
     expect(await controller.storeJobs(JOB)).toEqual(JOB);
     expect(db).toBeCalledTimes(1);
   });

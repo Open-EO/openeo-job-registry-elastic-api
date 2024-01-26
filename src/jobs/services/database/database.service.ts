@@ -19,18 +19,16 @@ export class DatabaseService {
 
   /**
    * Save a list of jobs to the database
-   * @param jobs - List of OpenEO jobs
+   * @param job - OpenEO job to store
    */
-  public async saveJobs(jobs: Job[]): Promise<Job[]> {
-    const body = [].concat(
-      ...jobs.map((j: Job) => [{ index: { _index: this.JOBS_INDEX } }, j]),
-    );
+  public async saveJobs(job: Job): Promise<Job> {
     const response: ApiResponse<Record<string, any>> =
-      await this.elasticSearch.bulk({
-        body,
+      await this.elasticSearch.index({
+        index: this.JOBS_INDEX,
+        body: job,
       });
 
-    if (response.statusCode !== 200) {
+    if (response.statusCode !== 201) {
       this.logger.error(
         'Could not save jobs to elasticsearch',
         JSON.stringify(response.body),
@@ -39,19 +37,8 @@ export class DatabaseService {
         'Could not store jobs as general call to database failed',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
-    } else if (this.hasBulkErrors(response.body)) {
-      const errors = this.getBulkErrors(response.body);
-      this.logger.error(
-        'Could not save jobs to elasticsearch',
-        JSON.stringify(errors),
-      );
-      throw new HttpException(
-        'Could not store all jobs: ' + JSON.stringify(errors),
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
     }
-
-    return jobs;
+    return job;
   }
 
   /**
