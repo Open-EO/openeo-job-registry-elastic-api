@@ -22,23 +22,32 @@ export class DatabaseService {
    * @param job - OpenEO job to store
    */
   public async saveJobs(job: Job): Promise<Job> {
-    const response: ApiResponse<Record<string, any>> =
-      await this.elasticSearch.index({
-        index: this.JOBS_INDEX,
-        body: job,
-      });
+    try {
+      const response: ApiResponse<Record<string, any>> =
+        await this.elasticSearch.index({
+          index: this.JOBS_INDEX,
+          body: job,
+        });
 
-    if (response.statusCode !== 201) {
-      this.logger.error(
-        'Could not save jobs to elasticsearch',
-        JSON.stringify(response.body),
-      );
+      if (response.statusCode !== 201) {
+        throw new Error(
+          `Could not save jobs to elasticsearch: ${JSON.stringify(
+            response.body,
+          )}`,
+        );
+      }
+      return job;
+    } catch (error: any) {
+      let message = error.toString();
+      if (error.constructor.name === 'ResponseError') {
+        message = `${error.meta.body.error.type} - ${error.meta.body.error.reason}`;
+      }
+      this.logger.error(`Could not store job in elasticsearch: ${message}`);
       throw new HttpException(
-        'Could not store jobs as general call to database failed',
+        `Could not store jobs in database: ${message}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-    return job;
   }
 
   /**
@@ -48,6 +57,7 @@ export class DatabaseService {
    * @param limit - The amount of documents to fetch (optional)
    * @param idsOnly - Only return the IDs of the document
    */
+
   /* istanbul ignore next */
   public async queryJobs(
     query: any,
@@ -74,6 +84,7 @@ export class DatabaseService {
     }
     return [];
   }
+
   /**
    * Execute a query on the jobs index.
    * @param query - ElasticSearch query to execute
@@ -81,6 +92,7 @@ export class DatabaseService {
    * @param limit - The amount of documents to fetch (optional)
    * @param idsOnly - Only return the IDs of the document
    */
+
   /* istanbul ignore next */
   public async executeJobQuery(
     query: any,
