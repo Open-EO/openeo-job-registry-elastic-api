@@ -42,7 +42,9 @@ export class DatabaseService {
       if (error.constructor.name === 'ResponseError') {
         message = `${error.meta.body.error.type} - ${error.meta.body.error.reason}`;
       }
-      this.logger.error(`Could not store job in elasticsearch: ${message}`);
+      this.logger.error(
+        `Could not store job ${job.job_id} in elasticsearch: ${message}`,
+      );
       throw new HttpException(
         `Could not store jobs in database: ${message}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -163,7 +165,9 @@ export class DatabaseService {
       if (error.constructor.name === 'ResponseError') {
         message = `${error.meta.body.error.type} - ${error.meta.body.error.reason}`;
       }
-      this.logger.error(`Could not update job in elasticsearch: ${message}`);
+      this.logger.error(
+        `Could not update job ${docId} in elasticsearch: ${message}`,
+      );
       throw new HttpException(
         `Could not update jobs in database: ${message}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
