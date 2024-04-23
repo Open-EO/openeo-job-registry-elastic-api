@@ -145,18 +145,30 @@ export class DatabaseService {
    * @param update - Partial update that should be applied
    */
   async patchJob(docId: string, update: ExtendedPatchJob): Promise<Job> {
-    await this.elasticSearch.update({
-      index: this.JOBS_INDEX,
-      id: docId,
-      body: {
-        doc: update,
-      },
-    });
-    const updated = await this.elasticSearch.get({
-      index: this.JOBS_INDEX,
-      id: docId,
-    });
-    return updated.body._source as Job;
+    try {
+      await this.elasticSearch.update({
+        index: this.JOBS_INDEX,
+        id: docId,
+        body: {
+          doc: update,
+        },
+      });
+      const updated = await this.elasticSearch.get({
+        index: this.JOBS_INDEX,
+        id: docId,
+      });
+      return updated.body._source as Job;
+    } catch (error: any) {
+      let message = error.toString();
+      if (error.constructor.name === 'ResponseError') {
+        message = `${error.meta.body.error.type} - ${error.meta.body.error.reason}`;
+      }
+      this.logger.error(`Could not update job in elasticsearch: ${message}`);
+      throw new HttpException(
+        `Could not update jobs in database: ${message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   /**
