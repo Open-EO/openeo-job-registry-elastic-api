@@ -10,6 +10,7 @@ import { JOB } from '../../mocks/job.mock';
 import { TransportRequestCallback } from '@elastic/elasticsearch/lib/Transport';
 import { QUERIES } from '../../mocks/query.mock';
 import { Logger } from '@nestjs/common';
+import { ResponseError } from '@elastic/elasticsearch/lib/errors';
 
 describe('DatabaseService', () => {
   let service: DatabaseService;
@@ -65,11 +66,31 @@ describe('DatabaseService', () => {
   });
 
   it('should throw an error if the bulk request fails', async () => {
-    const es = jest.spyOn(esService, 'index').mockReturnValueOnce({
+    let es = jest.spyOn(esService, 'index').mockReturnValueOnce({
       statusCode: 400,
     } as any);
     await expect(service.saveJobs(JOB)).rejects.toThrowError();
+
+    es = jest.spyOn(esService, 'index').mockImplementationOnce(() => {
+      throw Error('No can do!');
+    });
+    await expect(service.patchJob(JOB.job_id, JOB)).rejects.toThrowError();
+
     expect(es).toBeCalledTimes(1);
+  });
+
+  it('should throw an error if the update job fails', async () => {
+    let es = jest.spyOn(esService, 'update').mockReturnValueOnce({
+      statusCode: 400,
+    } as any);
+    await expect(service.patchJob(JOB.job_id, JOB)).rejects.toThrowError();
+
+    es = jest.spyOn(esService, 'update').mockImplementationOnce(() => {
+      throw Error('No can do!');
+    });
+    await expect(service.patchJob(JOB.job_id, JOB)).rejects.toThrowError();
+
+    expect(es).toBeCalledTimes(2);
   });
 
   it('should patch the job and retrieve the updated result', async () => {
