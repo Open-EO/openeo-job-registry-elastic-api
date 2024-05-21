@@ -22,8 +22,8 @@ const bootstrap = async () => {
   const app = await NestFactory.create(AppModule);
   const configService: ConfigService = app.get(ConfigService);
   setupDocs(app);
-  app.use(json({ limit: '5mb' }));
-  app.use(urlencoded({ extended: true, limit: '5mb' }));
+  app.use(json({ limit: '8mb' }));
+  app.use(urlencoded({ extended: true, limit: '8mb' }));
   app.useLogger(
     configService.get('general.debug')
       ? ['log', 'error', 'warn', 'debug', 'verbose']
