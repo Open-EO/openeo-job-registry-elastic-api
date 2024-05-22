@@ -1,5 +1,4 @@
 import { BearerStrategy, VERIFICATION_ERRORS } from './bearer.strategy';
-import { Logger } from '@nestjs/common';
 
 describe('BearerStrategy', () => {
   const mockClient: any = {
@@ -12,7 +11,7 @@ describe('BearerStrategy', () => {
   });
 
   it('should return an error when there is no client defined', async () => {
-    const strategy = new BearerStrategy(null, new Logger());
+    const strategy = new BearerStrategy(null);
     const verified = jest.fn();
     const verifyMock = jest
       .spyOn(mockClient, 'introspect')
@@ -32,7 +31,7 @@ describe('BearerStrategy', () => {
   });
 
   it('should verify the token', async () => {
-    const strategy = new BearerStrategy(mockClient, new Logger());
+    const strategy = new BearerStrategy(mockClient);
     const verified = jest.fn();
     const verifyMock = jest
       .spyOn(mockClient, 'introspect')
@@ -48,7 +47,7 @@ describe('BearerStrategy', () => {
   });
 
   it('should not verify token if not active', async () => {
-    const strategy = new BearerStrategy(mockClient, new Logger());
+    const strategy = new BearerStrategy(mockClient);
     const verified = jest.fn();
     const verifyMock = jest.spyOn(mockClient, 'introspect').mockResolvedValue({
       active: false,
@@ -66,7 +65,7 @@ describe('BearerStrategy', () => {
   });
 
   it('should not validate the token if an error occurred during the token validation', async () => {
-    const strategy = new BearerStrategy(mockClient, new Logger());
+    const strategy = new BearerStrategy(mockClient);
     const verified = jest.fn();
     const verifyMock = jest
       .spyOn(mockClient, 'introspect')
