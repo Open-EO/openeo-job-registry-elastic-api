@@ -45,7 +45,7 @@ export class BearerStrategy extends PassportStrategy(Strategy, 'bearer') {
 
     while (attempt <= attempts) {
       introspectResult = await this.introspectToken(token);
-      if (introspectResult.user) {
+      if (introspectResult.error !== VERIFICATION_ERRORS.GENERAL) {
         break;
       }
       attempt += 1;

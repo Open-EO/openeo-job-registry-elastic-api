@@ -56,7 +56,7 @@ describe('BearerStrategy', () => {
 
     await strategy.verify('token', verified, 3);
 
-    expect(verifyMock).toBeCalledTimes(3);
+    expect(verifyMock).toBeCalledTimes(1);
     expect(verified.mock.calls.length).toEqual(1);
     expect(verified.mock.calls[0]).toEqual([
       null,
