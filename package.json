@@ -109,7 +109,7 @@
       ".enum.ts",
       ".decorator.ts",
       "main.ts",
-      "bearer.",
+      "bearer.guard",
       ".mock.ts",
       ".middleware.ts"
     ],

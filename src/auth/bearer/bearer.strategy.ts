@@ -4,6 +4,7 @@ import { Strategy } from 'passport-http-bearer';
 import { ConfigService } from '../../config/config/config.service';
 import { Client, custom, IntrospectionResponse, Issuer } from 'openid-client';
 
+/* istanbul ignore next */
 export const buildBearerClient = async (configService: ConfigService) => {
   const issuer = await Issuer.discover(
     `${configService.get('auth.oidc.issuer')}/.well-known/openid-configuration`,
@@ -29,7 +30,7 @@ export class BearerStrategy extends PassportStrategy(Strategy, 'bearer') {
     this.client = client;
   }
 
-  private async verify(token: string, verified: (error, user, info) => void) {
+  public async verify(token: string, verified: (error, user, info) => void) {
     if (!this.client) {
       verified(`No client available for checking token`, null, null);
     } else {
@@ -54,6 +55,7 @@ export class BearerStrategy extends PassportStrategy(Strategy, 'bearer') {
           `An error occurred while verifying token ${token}: ${e}`,
           BearerStrategy.name,
         );
+        verified(`An error occurred while verifying the token`, null, null);
       }
     }
   }
