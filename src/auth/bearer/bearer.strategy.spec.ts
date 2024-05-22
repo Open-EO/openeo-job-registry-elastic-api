@@ -1,4 +1,4 @@
-import { BearerStrategy } from './bearer.strategy';
+import { BearerStrategy, VERIFICATION_ERRORS } from './bearer.strategy';
 import { Logger } from '@nestjs/common';
 
 describe('BearerStrategy', () => {
@@ -20,12 +20,12 @@ describe('BearerStrategy', () => {
         active: true,
       });
 
-    await strategy.verify('token', verified);
+    await strategy.verify('token', verified, 3);
 
     expect(verifyMock).toBeCalledTimes(0);
     expect(verified.mock.calls.length).toEqual(1);
     expect(verified.mock.calls[0]).toEqual([
-      'No client available for checking token',
+      VERIFICATION_ERRORS.NO_CLIENT,
       null,
       null,
     ]);
@@ -40,7 +40,7 @@ describe('BearerStrategy', () => {
         active: true,
       });
 
-    await strategy.verify('token', verified);
+    await strategy.verify('token', verified, 3);
 
     expect(verifyMock).toBeCalledTimes(1);
     expect(verified.mock.calls.length).toEqual(1);
@@ -50,17 +50,19 @@ describe('BearerStrategy', () => {
   it('should not verify token if not active', async () => {
     const strategy = new BearerStrategy(mockClient, new Logger());
     const verified = jest.fn();
-    const verifyMock = jest
-      .spyOn(mockClient, 'introspect')
-      .mockResolvedValueOnce({
-        active: false,
-      });
+    const verifyMock = jest.spyOn(mockClient, 'introspect').mockResolvedValue({
+      active: false,
+    });
 
-    await strategy.verify('token', verified);
+    await strategy.verify('token', verified, 3);
 
-    expect(verifyMock).toBeCalledTimes(1);
+    expect(verifyMock).toBeCalledTimes(3);
     expect(verified.mock.calls.length).toEqual(1);
-    expect(verified.mock.calls[0]).toEqual([null, null, 'token_invalid']);
+    expect(verified.mock.calls[0]).toEqual([
+      null,
+      null,
+      VERIFICATION_ERRORS.TOKEN_INVALID,
+    ]);
   });
 
   it('should not validate the token if an error occurred during the token validation', async () => {
@@ -68,16 +70,16 @@ describe('BearerStrategy', () => {
     const verified = jest.fn();
     const verifyMock = jest
       .spyOn(mockClient, 'introspect')
-      .mockImplementationOnce(() => {
+      .mockImplementation(() => {
         throw new Error('Nope!');
       });
 
-    await strategy.verify('token', verified);
+    await strategy.verify('token', verified, 3);
 
-    expect(verifyMock).toBeCalledTimes(1);
+    expect(verifyMock).toBeCalledTimes(3);
     expect(verified.mock.calls.length).toEqual(1);
     expect(verified.mock.calls[0]).toEqual([
-      'An error occurred while verifying the token',
+      VERIFICATION_ERRORS.GENERAL,
       null,
       null,
     ]);
