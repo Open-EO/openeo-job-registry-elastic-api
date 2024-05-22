@@ -5,6 +5,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { version } from '../package.json';
 import { ValidationPipe } from '@nestjs/common';
 import { json, urlencoded } from 'express';
+import { Logger } from 'nestjs-pino';
 
 const setupDocs = (app) => {
   const config = new DocumentBuilder()
@@ -24,11 +25,7 @@ const bootstrap = async () => {
   setupDocs(app);
   app.use(json({ limit: '8mb' }));
   app.use(urlencoded({ extended: true, limit: '8mb' }));
-  app.useLogger(
-    configService.get('general.debug')
-      ? ['log', 'error', 'warn', 'debug', 'verbose']
-      : ['error', 'warn'],
-  );
+  app.useLogger(app.get(Logger));
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,

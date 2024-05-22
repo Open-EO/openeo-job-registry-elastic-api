@@ -5,9 +5,43 @@ import { JobsModule } from './jobs/jobs.module';
 import { HealthModule } from './health/health.module';
 import { UtilsModule } from './utils/utils.module';
 import { LoggerMiddleware } from './middleware/logger.middleware';
+import { ConfigService } from './config/config/config.service';
+import { LoggerModule } from 'nestjs-pino';
+import { v4 as uuidv4 } from 'uuid';
 
 @Module({
-  imports: [ConfigModule, AuthModule, JobsModule, HealthModule, UtilsModule],
+  imports: [
+    ConfigModule,
+    AuthModule,
+    JobsModule,
+    HealthModule,
+    UtilsModule,
+    LoggerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (config: ConfigService) => {
+        const level = config.get('general.debug') ? 'debug' : 'warn';
+
+        return {
+          level,
+          pinoHttp: {
+            level,
+            genReqId: (request) =>
+              request.headers['x-correlation-id'] || uuidv4(),
+            transport: {
+              target: 'pino-pretty',
+              options: {
+                colorize: false,
+                messageFormat: `{req.id} - {req.method} {req.url} {res.statusCode} - {if context}({context}){end} {msg}{message}`,
+                hideObject: true,
+                translateTime: 'SYS:standard',
+              },
+            },
+          },
+        };
+      },
+    }),
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): any {
