@@ -14,12 +14,12 @@ export const schema: convict.Schema<AppConfig> = {
       env: 'PORT',
       arg: 'port',
     },
-    debug: {
-      doc: 'Enable debug logging',
-      format: 'Boolean',
-      default: false,
-      env: 'DEBUG',
-      arg: 'debug',
+    loglevel: {
+      doc: 'Set the log level',
+      format: 'String',
+      default: 'error',
+      env: 'LOG_LEVEL',
+      arg: 'loglevel',
     },
     pretty: {
       doc: 'Enable pretty logging',

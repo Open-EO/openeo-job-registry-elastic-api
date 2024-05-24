@@ -20,11 +20,10 @@ import { v4 as uuidv4 } from 'uuid';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: async (config: ConfigService) => {
-        const level = config.get('general.debug') ? 'debug' : 'info';
         return {
-          level,
+          level: config.get('general.loglevel'),
           pinoHttp: {
-            level,
+            level: config.get('general.loglevel'),
             genReqId: (request) =>
               request.headers['x-correlation-id'] || uuidv4(),
             transport: config.get('general.pretty')
