@@ -21,6 +21,13 @@ export const schema: convict.Schema<AppConfig> = {
       env: 'DEBUG',
       arg: 'debug',
     },
+    pretty: {
+      doc: 'Enable pretty logging',
+      format: 'Boolean',
+      default: false,
+      env: 'PRETTY',
+      arg: 'pretty',
+    },
   },
   auth: {
     type: {

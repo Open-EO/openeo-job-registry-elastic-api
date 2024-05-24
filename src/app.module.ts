@@ -21,22 +21,23 @@ import { v4 as uuidv4 } from 'uuid';
       inject: [ConfigService],
       useFactory: async (config: ConfigService) => {
         const level = config.get('general.debug') ? 'debug' : 'warn';
-
         return {
           level,
           pinoHttp: {
             level,
             genReqId: (request) =>
               request.headers['x-correlation-id'] || uuidv4(),
-            transport: {
-              target: 'pino-pretty',
-              options: {
-                colorize: false,
-                messageFormat: `{req.id} - {req.method} {req.url} {res.statusCode} - {if context}({context}){end} {msg}{message}`,
-                hideObject: true,
-                translateTime: 'SYS:standard',
-              },
-            },
+            transport: config.get('general.pretty')
+              ? {
+                  target: 'pino-pretty',
+                  options: {
+                    colorize: false,
+                    messageFormat: `{req.id} - {req.method} {req.url} {res.statusCode} - {if context}({context}){end} {msg}{message}`,
+                    hideObject: true,
+                    translateTime: 'SYS:standard',
+                  },
+                }
+              : undefined,
           },
         };
       },
