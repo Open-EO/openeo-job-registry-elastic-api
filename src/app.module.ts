@@ -20,7 +20,7 @@ import { v4 as uuidv4 } from 'uuid';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: async (config: ConfigService) => {
-        const level = config.get('general.debug') ? 'debug' : 'warn';
+        const level = config.get('general.debug') ? 'debug' : 'info';
         return {
           level,
           pinoHttp: {
