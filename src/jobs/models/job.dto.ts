@@ -1,45 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsArray,
-  IsBoolean,
-  IsDateString,
-  IsNotEmpty,
-  IsOptional,
-  ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-
-export class JobDependency {
-  @IsOptional()
-  @ApiProperty({
-    description: 'ID of the collection',
-    required: false,
-  })
-  collection_id?: string;
-
-  @IsOptional()
-  @IsArray()
-  @ApiProperty({
-    description: 'Batch request IDs',
-    required: false,
-  })
-  batch_request_ids?: string[];
-
-  @IsOptional()
-  @ApiProperty({
-    description: 'URL where the results are stored',
-    required: false,
-  })
-  results_location?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  @ApiProperty({
-    description: 'Card4L flag',
-    required: false,
-  })
-  card4l?: boolean;
-}
+import { IsArray, IsDateString, IsNotEmpty, IsOptional } from 'class-validator';
 
 export class PatchJob {
   @IsOptional()
@@ -117,14 +77,12 @@ export class PatchJob {
   description?: string;
 
   @IsOptional()
-  @ValidateNested({ each: true })
-  @Type(() => JobDependency)
   @IsArray()
   @ApiProperty({
     description: 'List of the dependencies of the job',
     required: false,
   })
-  dependencies?: JobDependency[];
+  dependencies?: any[];
 
   @IsOptional()
   @ApiProperty({
