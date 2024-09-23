@@ -92,6 +92,13 @@ export class PatchJob {
   dependency_status?: string;
 
   @IsOptional()
+  @ApiProperty({
+    description: 'Usage description of the dependencies',
+    required: false,
+  })
+  dependency_usage?: string;
+
+  @IsOptional()
   @IsArray()
   @ApiProperty({
     description: 'Links related to the job',
