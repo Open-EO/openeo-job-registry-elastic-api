@@ -84,4 +84,20 @@ export const schema: convict.Schema<AppConfig> = {
       arg: 'db_jobs_scroll_timeout',
     },
   },
+  cache: {
+    ttl: {
+      doc: 'TTL in miliseconds for caching the results',
+      format: 'Number',
+      default: 5000,
+      env: 'CACHE_TTL',
+      arg: 'cache_ttl',
+    },
+    max: {
+      doc: 'Maximum number of results to store in cache',
+      format: 'Number',
+      default: 100,
+      env: 'CACHE_MAX_ENTRIES',
+      arg: 'cache_max_entries',
+    },
+  },
 };

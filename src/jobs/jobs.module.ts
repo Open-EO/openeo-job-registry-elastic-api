@@ -4,11 +4,13 @@ import { ElasticsearchModule } from '@nestjs/elasticsearch';
 import { ConfigModule } from '../config/config.module';
 import { ConfigService } from '../config/config/config.service';
 import { DatabaseService } from './services/database/database.service';
+import { CachingModule } from '../caching/caching.module';
 
 @Module({
   controllers: [JobsController],
   imports: [
     ConfigModule,
+    CachingModule,
     ElasticsearchModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

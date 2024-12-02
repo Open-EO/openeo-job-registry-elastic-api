@@ -8,6 +8,7 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
 import { ConfigService } from './config/config/config.service';
 import { LoggerModule } from 'nestjs-pino';
 import { v4 as uuidv4 } from 'uuid';
+import { CachingModule } from './caching/caching.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { v4 as uuidv4 } from 'uuid';
         };
       },
     }),
+    CachingModule,
   ],
 })
 export class AppModule implements NestModule {

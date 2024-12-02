@@ -13,11 +13,13 @@ import {
 import { ApiBody, ApiOperation } from '@nestjs/swagger';
 import { Job, PatchJob } from '../../models/job.dto';
 import { DatabaseService } from '../../services/database/database.service';
+import { CachingService } from '../../../caching/services/cache.service';
 
 @Controller('jobs')
 export class JobsController {
   constructor(
     private databaseService: DatabaseService,
+    private cachingService: CachingService,
     private logger: Logger,
   ) {}
 
@@ -47,7 +49,15 @@ export class JobsController {
   })
   async queryJobs(@Body() query: any): Promise<Job[]> {
     try {
-      return (await this.databaseService.queryJobs(query)) as Job[];
+      const cacheKey = `search_result_${btoa(JSON.stringify(query))}`;
+      let result: Job[] = await this.cachingService.checkCache<Job[]>(cacheKey);
+
+      if (!result) {
+        result = (await this.databaseService.queryJobs(query)) as Job[];
+        await this.cachingService.store(cacheKey, result);
+      }
+
+      return result;
     } catch (error: any) {
       this.logger.error(
         `Could not query jobs: ${JSON.stringify(error)}`,
