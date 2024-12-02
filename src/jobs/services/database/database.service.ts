@@ -8,6 +8,7 @@ import { ApiResponse } from '@elastic/elasticsearch';
 @Injectable()
 export class DatabaseService {
   private JOBS_INDEX = '';
+  private JOBS_SCROLL_TIMEOUT = '5s';
 
   constructor(
     private configService: ConfigService,
@@ -15,6 +16,13 @@ export class DatabaseService {
     private logger: Logger,
   ) {
     this.JOBS_INDEX = this.configService.get('database.jobsIdx');
+    this.JOBS_SCROLL_TIMEOUT = this.configService.get(
+      'database.jobsScrollTimout',
+    );
+
+    this.logger.debug(
+      `Starting up databse service for jobs at index ${this.JOBS_INDEX} and scroll timeout of ${this.JOBS_SCROLL_TIMEOUT}`,
+    );
   }
 
   /**
@@ -115,7 +123,7 @@ export class DatabaseService {
     // Perform initial search
     const results = await this.elasticSearch.search({
       index: this.JOBS_INDEX,
-      scroll: '5s',
+      scroll: this.JOBS_SCROLL_TIMEOUT,
       body: query,
       size: limit || 1000,
     });
@@ -134,7 +142,7 @@ export class DatabaseService {
       queue.push(
         await this.elasticSearch.scroll({
           scroll_id: body._scroll_id,
-          scroll: '5s',
+          scroll: this.JOBS_SCROLL_TIMEOUT,
         }),
       );
     }
