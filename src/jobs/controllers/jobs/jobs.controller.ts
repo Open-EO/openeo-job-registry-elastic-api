@@ -49,7 +49,11 @@ export class JobsController {
     try {
       return (await this.databaseService.queryJobs(query)) as Job[];
     } catch (error: any) {
-      this.logger.error(`Could not query jobs`, error, JobsController.name);
+      this.logger.error(
+        `Could not query jobs: ${JSON.stringify(error)}`,
+        error,
+        JobsController.name,
+      );
       throw new InternalServerErrorException(
         `Could not query jobs: ${error.message}`,
       );
