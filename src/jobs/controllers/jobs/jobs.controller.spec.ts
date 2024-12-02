@@ -6,6 +6,7 @@ import { ConfigService } from '../../../config/config/config.service';
 import { DatabaseService } from '../../services/database/database.service';
 import { Logger } from '@nestjs/common';
 import { JOB } from '../../mocks/job.mock';
+import { CachingModule } from '../../../caching/caching.module';
 
 describe('JobsController', () => {
   let controller: JobsController;
@@ -25,6 +26,7 @@ describe('JobsController', () => {
           }),
           inject: [ConfigService],
         }),
+        CachingModule,
       ],
       controllers: [JobsController],
       providers: [DatabaseService, Logger],
