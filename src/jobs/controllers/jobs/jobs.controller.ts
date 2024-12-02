@@ -14,6 +14,7 @@ import { ApiBody, ApiOperation } from '@nestjs/swagger';
 import { Job, PatchJob } from '../../models/job.dto';
 import { DatabaseService } from '../../services/database/database.service';
 import { CachingService } from '../../../caching/services/cache.service';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('jobs')
 export class JobsController {

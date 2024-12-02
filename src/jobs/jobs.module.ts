@@ -5,6 +5,7 @@ import { ConfigModule } from '../config/config.module';
 import { ConfigService } from '../config/config/config.service';
 import { DatabaseService } from './services/database/database.service';
 import { CachingModule } from '../caching/caching.module';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
   controllers: [JobsController],

@@ -86,7 +86,7 @@ export const schema: convict.Schema<AppConfig> = {
   },
   cache: {
     ttl: {
-      doc: 'TTL in miliseconds for caching the results',
+      doc: 'TTL in milliseconds for caching the results',
       format: 'Number',
       default: 5000,
       env: 'CACHE_TTL',
@@ -98,6 +98,22 @@ export const schema: convict.Schema<AppConfig> = {
       default: 100,
       env: 'CACHE_MAX_ENTRIES',
       arg: 'cache_max_entries',
+    },
+  },
+  throttle: {
+    ttl: {
+      doc: 'TTL in milliseconds for throttling the requests',
+      format: 'Number',
+      default: 60000,
+      env: 'THROTTLE_TTL',
+      arg: 'throttle_ttl',
+    },
+    limit: {
+      doc: 'Limit for throttling the requests',
+      format: 'Number',
+      default: 1000,
+      env: 'THROTTLE_LIMIT',
+      arg: 'throttle_limit',
     },
   },
 };
