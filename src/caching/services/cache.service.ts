@@ -19,7 +19,7 @@ export class CachingService {
       if (result) {
         this.logger.debug(`Found result in cache`);
       } else {
-        this.logger.warn('Could not find entry in cache');
+        this.logger.debug('Could not find entry in cache');
       }
       return result;
     } catch (error) {
