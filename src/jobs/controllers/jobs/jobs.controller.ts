@@ -14,13 +14,14 @@ import { ApiBody, ApiOperation } from '@nestjs/swagger';
 import { Job, PatchJob } from '../../models/job.dto';
 import { DatabaseService } from '../../services/database/database.service';
 import { CachingService } from '../../../caching/services/cache.service';
-import { Throttle } from '@nestjs/throttler';
+import { ConfigService } from '../../../config/config/config.service';
 
 @Controller('jobs')
 export class JobsController {
   constructor(
     private databaseService: DatabaseService,
     private cachingService: CachingService,
+    private configService: ConfigService,
     private logger: Logger,
   ) {}
 
@@ -54,7 +55,7 @@ export class JobsController {
       let result: Job[] = await this.cachingService.checkCache<Job[]>(cacheKey);
 
       if (!result) {
-        result = (await this.databaseService.queryJobs(query)) as Job[];
+        result = (await this.databaseService.queryJobs(query, null, this.configService.get('database.maxResults'))) as Job[];
         await this.cachingService.store(cacheKey, result);
       }
 

@@ -123,9 +123,9 @@ export class DatabaseService {
     // Perform initial search
     const results = await this.elasticSearch.search({
       index: this.JOBS_INDEX,
-      scroll: this.JOBS_SCROLL_TIMEOUT,
       body: query,
       size: limit || 1000,
+      sort: 'created:desc',
     });
     queue.push(results);
 
