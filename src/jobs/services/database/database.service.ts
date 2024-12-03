@@ -123,7 +123,7 @@ export class DatabaseService {
     const { body } = await this.elasticSearch.search({
       index: this.JOBS_INDEX,
       body: query,
-      size: limit || 1000,
+      size: limit || this.configService.get('database.maxResults'),
       sort: ['created:desc', '_id:asc'],
     });
 

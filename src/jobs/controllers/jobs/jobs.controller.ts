@@ -55,11 +55,7 @@ export class JobsController {
       let result: Job[] = await this.cachingService.checkCache<Job[]>(cacheKey);
 
       if (!result) {
-        result = (await this.databaseService.queryJobs(
-          query,
-          null,
-          this.configService.get('database.maxResults'),
-        )) as Job[];
+        result = (await this.databaseService.queryJobs(query)) as Job[];
         await this.cachingService.store(cacheKey, result);
       }
 
