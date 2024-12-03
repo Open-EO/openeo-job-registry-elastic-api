@@ -112,7 +112,7 @@ describe('DatabaseService', () => {
   it('should not retry getting the job ID if the request returned an ID', async () => {
     const getJobID = jest
       .spyOn(service, 'queryJobs')
-      .mockResolvedValue(['foobar_id']);
+      .mockResolvedValue({ jobs: ['foobar_id'], pagination: {} });
 
     const id = await service.getJobDocId('foobar');
     expect(getJobID).toBeCalledTimes(1);
@@ -122,7 +122,7 @@ describe('DatabaseService', () => {
   it('should retry getting the job ID if the request failed', async () => {
     const getJobID = jest
       .spyOn(service, 'executeJobQuery')
-      .mockResolvedValue([]);
+      .mockResolvedValue({ jobs: [], pagination: {} });
 
     const id = await service.getJobDocId('foobar');
     expect(getJobID).toBeCalledTimes(5);
@@ -163,7 +163,7 @@ describe('DatabaseService', () => {
       .spyOn(service, 'addDeletedFilter')
       .mockReturnValueOnce(QUERIES[1].input);
 
-    await service.queryJobs(QUERIES[1].input, true);
+    await service.queryJobs(QUERIES[1].input, 0, 1, true);
     expect(deletedFilter).toBeCalledTimes(0);
   });
   it('should correctly update the query to filter out deleted documents', async () => {

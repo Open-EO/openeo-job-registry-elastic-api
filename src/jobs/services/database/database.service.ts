@@ -4,6 +4,7 @@ import { ExtendedPatchJob, Job } from '../../models/job.dto';
 import { ConfigService } from '../../../config/config/config.service';
 import { UtilsService } from '../../../utils/services/utils/utils.service';
 import { ApiResponse } from '@elastic/elasticsearch';
+import { Pagination } from '../../models/pagination.dto';
 
 @Injectable()
 export class DatabaseService {
@@ -63,41 +64,48 @@ export class DatabaseService {
   /**
    * Given an ElasticSearch query, return the list of jobs that matches the query
    * @param query - ElasticSearch query to execute
-   * @param deleted - Flag indicating if the deleted docs should be included (true) or not (false)
+   * @param page - Page to request
    * @param limit - The amount of documents to fetch (optional)
+   * @param deleted - Flag indicating if the deleted docs should be included (true) or not (false)
    * @param idsOnly - Only return the IDs of the document
    */
 
   /* istanbul ignore next */
   public async queryJobs(
     query: any,
-    deleted?: boolean,
+    page?: number,
     limit?: number,
+    deleted?: boolean,
     idsOnly?: boolean,
-  ): Promise<Job[] | string[]> {
+  ): Promise<Pagination> {
     let retries = 1;
 
     while (retries <= 5) {
       const results = await this.executeJobQuery(
         query,
-        deleted,
+        page,
         limit,
+        deleted,
         idsOnly,
       );
 
-      if (results.length > 0) {
+      if (results.jobs.length > 0) {
         return results;
       } else {
         await UtilsService.sleep(500);
         retries++;
       }
     }
-    return [];
+    return {
+      jobs: [],
+      pagination: {},
+    };
   }
 
   /**
    * Execute a query on the jobs index.
    * @param query - ElasticSearch query to execute
+   * @param page - Page to search
    * @param deleted - Flag indicating if the deleted docs should be included (true) or not (false)
    * @param limit - The amount of documents to fetch (optional)
    * @param idsOnly - Only return the IDs of the document
@@ -106,11 +114,14 @@ export class DatabaseService {
   /* istanbul ignore next */
   public async executeJobQuery(
     query: any,
-    deleted?: boolean,
+    page?: number,
     limit?: number,
+    deleted?: boolean,
     idsOnly?: boolean,
-  ): Promise<Job[] | string[]> {
+  ): Promise<Pagination> {
     let jobs: Job[] = [];
+    const size = limit || this.configService.get('database.maxResults');
+    const from = (page || 0) * size;
 
     if (Object.keys(query).length === 0) {
       throw new Error(`empty query`);
@@ -122,8 +133,12 @@ export class DatabaseService {
     // Perform initial search
     const { body } = await this.elasticSearch.search({
       index: this.JOBS_INDEX,
-      body: query,
-      size: limit || this.configService.get('database.maxResults'),
+      track_total_hits: false,
+      body: {
+        ...query,
+      },
+      from,
+      size,
       sort: ['created:desc', '_id:asc'],
     });
 
@@ -132,7 +147,16 @@ export class DatabaseService {
       ...body.hits.hits.map((h) => (idsOnly ? h._id : h._source)),
     ];
 
-    return jobs;
+    return {
+      jobs,
+      pagination: {
+        previous: page > 0 ? `size=${size}&page=${page - 1}` : null,
+        next:
+          body.hits.hits.length === size
+            ? `size=${size}&page=${page + 1}`
+            : null,
+      },
+    };
   }
 
   /**
@@ -174,13 +198,14 @@ export class DatabaseService {
    * @param jobId - Job ID to search for
    */
   async getJobDocId(jobId: string): Promise<string> {
-    const ids: string[] = (await this.queryJobs(
+    const { jobs } = await this.queryJobs(
       this.getJobQuery(jobId),
-      false,
+      null,
       1,
+      false,
       true,
-    )) as string[];
-    return ids.length > 0 ? ids[0] : undefined;
+    );
+    return jobs.length > 0 ? (jobs[0] as string) : undefined;
   }
 
   /**

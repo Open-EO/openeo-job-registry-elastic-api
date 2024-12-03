@@ -56,7 +56,7 @@ describe('JobsController', () => {
   it('should search the jobs based on an give query', async () => {
     const db = jest
       .spyOn(databaseService, 'queryJobs')
-      .mockResolvedValueOnce([JOB]);
+      .mockResolvedValueOnce({ jobs: [JOB], pagination: {} });
 
     expect(await controller.queryJobs({})).toEqual([JOB]);
     expect(db).toBeCalledTimes(1);
@@ -69,6 +69,26 @@ describe('JobsController', () => {
         throw new Error('No can do!');
       });
     await expect(controller.queryJobs({})).rejects.toThrowError();
+    expect(db).toBeCalledTimes(1);
+  });
+
+  it('should execute a paginated search for jobs based on an give query', async () => {
+    const expectedResult = { jobs: [JOB], pagination: {} };
+    const db = jest
+      .spyOn(databaseService, 'queryJobs')
+      .mockResolvedValueOnce(expectedResult);
+
+    expect(await controller.queryJobsPaginated({}, 20)).toEqual(expectedResult);
+    expect(db).toBeCalledTimes(1);
+  });
+
+  it('should throw an error when something went wrong when querying the database in paginated search', async () => {
+    const db = jest
+      .spyOn(databaseService, 'queryJobs')
+      .mockImplementationOnce(() => {
+        throw new Error('No can do!');
+      });
+    await expect(controller.queryJobsPaginated({}, 20)).rejects.toThrowError();
     expect(db).toBeCalledTimes(1);
   });
 

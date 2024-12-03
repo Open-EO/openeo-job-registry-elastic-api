@@ -9,19 +9,20 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation } from '@nestjs/swagger';
 import { Job, PatchJob } from '../../models/job.dto';
 import { DatabaseService } from '../../services/database/database.service';
 import { CachingService } from '../../../caching/services/cache.service';
 import { ConfigService } from '../../../config/config/config.service';
+import { Pagination } from '../../models/pagination.dto';
 
 @Controller('jobs')
 export class JobsController {
   constructor(
     private databaseService: DatabaseService,
     private cachingService: CachingService,
-    private configService: ConfigService,
     private logger: Logger,
   ) {}
 
@@ -38,6 +39,47 @@ export class JobsController {
     return await this.databaseService.saveJobs(job);
   }
 
+  @Post('/search/paginated')
+  @HttpCode(200)
+  @ApiOperation({
+    tags: ['jobs'],
+    summary: 'Paginated search for reported jobs using an ElasticSearch query',
+  })
+  @ApiBody({
+    type: Object,
+    description: 'Query supported by ElasticSearch',
+    required: true,
+  })
+  async queryJobsPaginated(
+    @Body() query: any,
+    @Query('size') size: number,
+    @Query('page') page?: number,
+  ): Promise<Pagination> {
+    try {
+      const p = page || 0;
+      const cacheKey = `paginated_search_result_${btoa(
+        JSON.stringify(query),
+      )}_${size}_${p}`;
+      let result = await this.cachingService.checkCache<Pagination>(cacheKey);
+
+      if (!result) {
+        result = await this.databaseService.queryJobs(query, p, size, false);
+        await this.cachingService.store(cacheKey, result);
+      }
+
+      return result;
+    } catch (error: any) {
+      this.logger.error(
+        `Could not query paginated jobs: ${JSON.stringify(error)}`,
+        error,
+        JobsController.name,
+      );
+      throw new InternalServerErrorException(
+        `Could not query paginated jobs: ${error.message}`,
+      );
+    }
+  }
+
   @Post('/search')
   @HttpCode(200)
   @ApiOperation({
@@ -52,14 +94,15 @@ export class JobsController {
   async queryJobs(@Body() query: any): Promise<Job[]> {
     try {
       const cacheKey = `search_result_${btoa(JSON.stringify(query))}`;
-      let result: Job[] = await this.cachingService.checkCache<Job[]>(cacheKey);
+      let jobs: Job[] = await this.cachingService.checkCache<Job[]>(cacheKey);
 
-      if (!result) {
-        result = (await this.databaseService.queryJobs(query)) as Job[];
-        await this.cachingService.store(cacheKey, result);
+      if (!jobs) {
+        const result = await this.databaseService.queryJobs(query);
+        jobs = result.jobs as Job[];
+        await this.cachingService.store(cacheKey, jobs);
       }
 
-      return result;
+      return jobs;
     } catch (error: any) {
       this.logger.error(
         `Could not query jobs: ${JSON.stringify(error)}`,
