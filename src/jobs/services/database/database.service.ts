@@ -110,7 +110,6 @@ export class DatabaseService {
     limit?: number,
     idsOnly?: boolean,
   ): Promise<Job[] | string[]> {
-    const queue = [];
     let jobs: Job[] = [];
 
     if (Object.keys(query).length === 0) {
@@ -125,7 +124,7 @@ export class DatabaseService {
       index: this.JOBS_INDEX,
       body: query,
       size: limit || 1000,
-      sort: 'created:desc',
+      sort: ['created:desc', '_id:asc'],
     });
 
     jobs = [
