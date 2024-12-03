@@ -121,31 +121,18 @@ export class DatabaseService {
       query = this.addDeletedFilter(query);
     }
     // Perform initial search
-    const results = await this.elasticSearch.search({
+    const { body } = await this.elasticSearch.search({
       index: this.JOBS_INDEX,
       body: query,
       size: limit || 1000,
       sort: 'created:desc',
     });
-    queue.push(results);
 
-    while (queue.length) {
-      const { body } = queue.shift();
-      jobs = [
-        ...jobs,
-        ...body.hits.hits.map((h) => (idsOnly ? h._id : h._source)),
-      ];
+    jobs = [
+      ...jobs,
+      ...body.hits.hits.map((h) => (idsOnly ? h._id : h._source)),
+    ];
 
-      if (body.hits.total.value === jobs.length) {
-        break;
-      }
-      queue.push(
-        await this.elasticSearch.scroll({
-          scroll_id: body._scroll_id,
-          scroll: this.JOBS_SCROLL_TIMEOUT,
-        }),
-      );
-    }
     return jobs;
   }
 

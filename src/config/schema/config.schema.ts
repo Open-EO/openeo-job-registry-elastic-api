@@ -85,8 +85,8 @@ export const schema: convict.Schema<AppConfig> = {
     },
     maxResults: {
       doc: 'Max results to return for query',
-      format: '*',
-      default: '5s',
+      format: 'Number',
+      default: 100,
       env: 'DB_MAX_RESULTS',
       arg: 'db_max_results',
     },
