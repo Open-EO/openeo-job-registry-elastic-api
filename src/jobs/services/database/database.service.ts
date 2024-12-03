@@ -9,7 +9,6 @@ import { Pagination } from '../../models/pagination.dto';
 @Injectable()
 export class DatabaseService {
   private JOBS_INDEX = '';
-  private JOBS_SCROLL_TIMEOUT = '5s';
 
   constructor(
     private configService: ConfigService,
@@ -17,12 +16,9 @@ export class DatabaseService {
     private logger: Logger,
   ) {
     this.JOBS_INDEX = this.configService.get('database.jobsIdx');
-    this.JOBS_SCROLL_TIMEOUT = this.configService.get(
-      'database.jobsScrollTimout',
-    );
 
     this.logger.debug(
-      `Starting up databse service for jobs at index ${this.JOBS_INDEX} and scroll timeout of ${this.JOBS_SCROLL_TIMEOUT}`,
+      `Starting up databse service for jobs at index ${this.JOBS_INDEX}`,
     );
   }
 
