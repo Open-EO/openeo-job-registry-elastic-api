@@ -146,11 +146,8 @@ export class DatabaseService {
     return {
       jobs,
       pagination: {
-        previous: page > 0 ? `size=${size}&page=${page - 1}` : null,
-        next:
-          body.hits.hits.length === size
-            ? `size=${size}&page=${page + 1}`
-            : null,
+        previous: page > 0 ? { size, page: page - 1 } : null,
+        next: body.hits.hits.length === size ? { size, page: page + 1 } : null,
       },
     };
   }

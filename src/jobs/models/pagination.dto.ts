@@ -19,9 +19,20 @@ export class PaginationDetails {
   @ApiProperty({
     description: 'URL parameters to use to fetch the previous page',
   })
-  previous?: string;
+  previous?: PageDetails;
   @ApiProperty({
     description: 'URL parameters to use to fetch the next page',
   })
-  next?: string;
+  next?: PageDetails;
+}
+
+export class PageDetails {
+  @ApiProperty({
+    description: 'Size to be requested for the next page',
+  })
+  size: number;
+  @ApiProperty({
+    description: 'Number of the page to request',
+  })
+  page: number;
 }
