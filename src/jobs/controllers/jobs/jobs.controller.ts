@@ -1,21 +1,22 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Delete,
   HttpCode,
   InternalServerErrorException,
   Logger,
   NotFoundException,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiBody, ApiOperation } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { Job, PatchJob } from '../../models/job.dto';
 import { DatabaseService } from '../../services/database/database.service';
 import { CachingService } from '../../../caching/services/cache.service';
-import { ConfigService } from '../../../config/config/config.service';
 import { Pagination } from '../../models/pagination.dto';
 
 @Controller('jobs')
@@ -50,20 +51,31 @@ export class JobsController {
     description: 'Query supported by ElasticSearch',
     required: true,
   })
+  @ApiQuery({
+    name: 'size',
+    type: Number,
+    description: 'Number of elements to return on each page',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'page',
+    type: Number,
+    description: 'Page number to request',
+    required: false,
+  })
   async queryJobsPaginated(
     @Body() query: any,
-    @Query('size') size: number,
-    @Query('page') page?: number,
+    @Query('size', new DefaultValuePipe(10), ParseIntPipe) size: number,
+    @Query('page', new DefaultValuePipe(0), ParseIntPipe) page?: number,
   ): Promise<Pagination> {
     try {
-      const p = page || 0;
       const cacheKey = `paginated_search_result_${btoa(
         JSON.stringify(query),
-      )}_${size}_${p}`;
+      )}_${size}_${page}`;
       let result = await this.cachingService.checkCache<Pagination>(cacheKey);
 
       if (!result) {
-        result = await this.databaseService.queryJobs(query, p, size, false);
+        result = await this.databaseService.queryJobs(query, page, size, false);
         await this.cachingService.store(cacheKey, result);
       }
 
