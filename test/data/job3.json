@@ -1,0 +1,774 @@
+{
+  "backend_id": "test_cli",
+  "user_id": "nestjs-e2e-test",
+  "job_id": "test-3",
+  "process": {
+    "process_graph": {
+      "vectorbuffer1": {
+        "process_id": "vector_buffer",
+        "arguments": {
+          "distance": 1280,
+          "geometry": {
+            "type": "FeatureCollection",
+            "features": [
+              {
+                "type": "Feature",
+                "properties": {},
+                "geometry": {
+                  "coordinates": [
+                    [
+                      [
+                        5.179217723264486,
+                        51.24988911287846
+                      ],
+                      [
+                        5.178577686573021,
+                        51.24674870133239
+                      ],
+                      [
+                        5.185205163282291,
+                        51.24499101114779
+                      ],
+                      [
+                        5.186732992804082,
+                        51.24528827229568
+                      ],
+                      [
+                        5.187331736805447,
+                        51.249230031940186
+                      ],
+                      [
+                        5.179217723264486,
+                        51.24988911287846
+                      ]
+                    ]
+                  ],
+                  "type": "Polygon"
+                }
+              }
+            ]
+          },
+          "unit": "meter"
+        }
+      },
+      "dateshift1": {
+        "process_id": "date_shift",
+        "arguments": {
+          "date": "2023-06-01",
+          "unit": "day",
+          "value": -80
+        }
+      },
+      "dateshift2": {
+        "process_id": "date_shift",
+        "arguments": {
+          "date": "2023-06-10",
+          "unit": "day",
+          "value": 80
+        }
+      },
+      "loadcollection1": {
+        "process_id": "load_collection",
+        "arguments": {
+          "bands": [
+            "VH",
+            "VV"
+          ],
+          "id": "SENTINEL1_GRD",
+          "properties": {
+            "sat:orbit_state": {
+              "process_graph": {
+                "eq1": {
+                  "process_id": "eq",
+                  "arguments": {
+                    "x": {
+                      "from_parameter": "value"
+                    },
+                    "y": "ASCENDING"
+                  },
+                  "result": true
+                }
+              }
+            },
+            "polarisation": {
+              "process_graph": {
+                "eq2": {
+                  "process_id": "eq",
+                  "arguments": {
+                    "x": {
+                      "from_parameter": "value"
+                    },
+                    "y": "VV&VH"
+                  },
+                  "result": true
+                }
+              }
+            }
+          },
+          "spatial_extent": {
+            "from_node": "vectorbuffer1"
+          },
+          "temporal_extent": [
+            {
+              "from_node": "dateshift1"
+            },
+            {
+              "from_node": "dateshift2"
+            }
+          ]
+        }
+      },
+      "sarbackscatter1": {
+        "process_id": "sar_backscatter",
+        "arguments": {
+          "coefficient": "sigma0-ellipsoid",
+          "contributing_area": false,
+          "data": {
+            "from_node": "loadcollection1"
+          },
+          "elevation_model": "COPERNICUS_30",
+          "ellipsoid_incidence_angle": false,
+          "local_incidence_angle": false,
+          "mask": false,
+          "noise_removal": true
+        }
+      },
+      "renamelabels1": {
+        "process_id": "rename_labels",
+        "arguments": {
+          "data": {
+            "from_node": "sarbackscatter1"
+          },
+          "dimension": "bands",
+          "target": [
+            "VH_ASCENDING",
+            "VV_ASCENDING"
+          ]
+        }
+      },
+      "loadcollection2": {
+        "process_id": "load_collection",
+        "arguments": {
+          "bands": [
+            "VH",
+            "VV"
+          ],
+          "id": "SENTINEL1_GRD",
+          "properties": {
+            "sat:orbit_state": {
+              "process_graph": {
+                "eq3": {
+                  "process_id": "eq",
+                  "arguments": {
+                    "x": {
+                      "from_parameter": "value"
+                    },
+                    "y": "DESCENDING"
+                  },
+                  "result": true
+                }
+              }
+            },
+            "polarisation": {
+              "process_graph": {
+                "eq4": {
+                  "process_id": "eq",
+                  "arguments": {
+                    "x": {
+                      "from_parameter": "value"
+                    },
+                    "y": "VV&VH"
+                  },
+                  "result": true
+                }
+              }
+            }
+          },
+          "spatial_extent": {
+            "from_node": "vectorbuffer1"
+          },
+          "temporal_extent": [
+            {
+              "from_node": "dateshift1"
+            },
+            {
+              "from_node": "dateshift2"
+            }
+          ]
+        }
+      },
+      "sarbackscatter2": {
+        "process_id": "sar_backscatter",
+        "arguments": {
+          "coefficient": "sigma0-ellipsoid",
+          "contributing_area": false,
+          "data": {
+            "from_node": "loadcollection2"
+          },
+          "elevation_model": "COPERNICUS_30",
+          "ellipsoid_incidence_angle": false,
+          "local_incidence_angle": false,
+          "mask": false,
+          "noise_removal": true
+        }
+      },
+      "renamelabels2": {
+        "process_id": "rename_labels",
+        "arguments": {
+          "data": {
+            "from_node": "sarbackscatter2"
+          },
+          "dimension": "bands",
+          "target": [
+            "VH_DESCENDING",
+            "VV_DESCENDING"
+          ]
+        }
+      },
+      "mergecubes1": {
+        "process_id": "merge_cubes",
+        "arguments": {
+          "cube1": {
+            "from_node": "renamelabels1"
+          },
+          "cube2": {
+            "from_node": "renamelabels2"
+          }
+        }
+      },
+      "filterspatial1": {
+        "process_id": "filter_spatial",
+        "arguments": {
+          "data": {
+            "from_node": "mergecubes1"
+          },
+          "geometries": {
+            "from_node": "vectorbuffer1"
+          }
+        }
+      },
+      "loadcollection3": {
+        "process_id": "load_collection",
+        "arguments": {
+          "bands": [
+            "B04",
+            "B08",
+            "SCL"
+          ],
+          "id": "SENTINEL2_L2A",
+          "properties": {
+            "eo:cloud_cover": {
+              "process_graph": {
+                "lte1": {
+                  "process_id": "lte",
+                  "arguments": {
+                    "x": {
+                      "from_parameter": "value"
+                    },
+                    "y": 95
+                  },
+                  "result": true
+                }
+              }
+            }
+          },
+          "spatial_extent": {
+            "from_node": "vectorbuffer1"
+          },
+          "temporal_extent": [
+            {
+              "from_node": "dateshift1"
+            },
+            {
+              "from_node": "dateshift2"
+            }
+          ]
+        }
+      },
+      "maskscldilation1": {
+        "process_id": "mask_scl_dilation",
+        "arguments": {
+          "data": {
+            "from_node": "loadcollection3"
+          },
+          "erosion_kernel_size": 3,
+          "kernel1_size": 17,
+          "kernel2_size": 77,
+          "mask1_values": [
+            2,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mask2_values": [
+            3,
+            8,
+            9,
+            10,
+            11
+          ],
+          "scl_band_name": "SCL"
+        }
+      },
+      "ndvi1": {
+        "process_id": "ndvi",
+        "arguments": {
+          "data": {
+            "from_node": "maskscldilation1"
+          },
+          "nir": "B08",
+          "red": "B04",
+          "target_band": "NDVI"
+        }
+      },
+      "filterbands1": {
+        "process_id": "filter_bands",
+        "arguments": {
+          "bands": [
+            "NDVI"
+          ],
+          "data": {
+            "from_node": "ndvi1"
+          }
+        }
+      },
+      "BIOPAR1": {
+        "process_id": "BIOPAR",
+        "arguments": {
+          "biopar_type": "FCOVER",
+          "date": [
+            {
+              "from_node": "dateshift1"
+            },
+            {
+              "from_node": "dateshift2"
+            }
+          ],
+          "max_cloud_cover": 95,
+          "polygon": {
+            "from_node": "vectorbuffer1"
+          }
+        },
+        "namespace": "https://openeo.dataspace.copernicus.eu/openeo/processes/u:29ac8c0d-e6b4-4e50-9a9b-deeeb2f3684a/BIOPAR"
+      },
+      "loadcollection4": {
+        "process_id": "load_collection",
+        "arguments": {
+          "bands": [
+            "SCL"
+          ],
+          "id": "SENTINEL2_L2A",
+          "properties": {
+            "eo:cloud_cover": {
+              "process_graph": {
+                "lte2": {
+                  "process_id": "lte",
+                  "arguments": {
+                    "x": {
+                      "from_parameter": "value"
+                    },
+                    "y": 95
+                  },
+                  "result": true
+                }
+              }
+            }
+          },
+          "spatial_extent": {
+            "from_node": "vectorbuffer1"
+          },
+          "temporal_extent": [
+            {
+              "from_node": "dateshift1"
+            },
+            {
+              "from_node": "dateshift2"
+            }
+          ]
+        }
+      },
+      "mergecubes2": {
+        "process_id": "merge_cubes",
+        "arguments": {
+          "cube1": {
+            "from_node": "BIOPAR1"
+          },
+          "cube2": {
+            "from_node": "loadcollection4"
+          }
+        }
+      },
+      "maskscldilation2": {
+        "process_id": "mask_scl_dilation",
+        "arguments": {
+          "data": {
+            "from_node": "mergecubes2"
+          },
+          "erosion_kernel_size": 3,
+          "kernel1_size": 17,
+          "kernel2_size": 77,
+          "mask1_values": [
+            2,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mask2_values": [
+            3,
+            8,
+            9,
+            10,
+            11
+          ],
+          "scl_band_name": "SCL"
+        }
+      },
+      "filterbands2": {
+        "process_id": "filter_bands",
+        "arguments": {
+          "bands": [
+            "FCOVER"
+          ],
+          "data": {
+            "from_node": "maskscldilation2"
+          }
+        }
+      },
+      "BIOPAR2": {
+        "process_id": "BIOPAR",
+        "arguments": {
+          "biopar_type": "FAPAR",
+          "date": [
+            {
+              "from_node": "dateshift1"
+            },
+            {
+              "from_node": "dateshift2"
+            }
+          ],
+          "max_cloud_cover": 95,
+          "polygon": {
+            "from_node": "vectorbuffer1"
+          }
+        },
+        "namespace": "https://openeo.dataspace.copernicus.eu/openeo/processes/u:29ac8c0d-e6b4-4e50-9a9b-deeeb2f3684a/BIOPAR"
+      },
+      "loadcollection5": {
+        "process_id": "load_collection",
+        "arguments": {
+          "bands": [
+            "SCL"
+          ],
+          "id": "SENTINEL2_L2A",
+          "properties": {
+            "eo:cloud_cover": {
+              "process_graph": {
+                "lte3": {
+                  "process_id": "lte",
+                  "arguments": {
+                    "x": {
+                      "from_parameter": "value"
+                    },
+                    "y": 95
+                  },
+                  "result": true
+                }
+              }
+            }
+          },
+          "spatial_extent": {
+            "from_node": "vectorbuffer1"
+          },
+          "temporal_extent": [
+            {
+              "from_node": "dateshift1"
+            },
+            {
+              "from_node": "dateshift2"
+            }
+          ]
+        }
+      },
+      "mergecubes3": {
+        "process_id": "merge_cubes",
+        "arguments": {
+          "cube1": {
+            "from_node": "BIOPAR2"
+          },
+          "cube2": {
+            "from_node": "loadcollection5"
+          }
+        }
+      },
+      "maskscldilation3": {
+        "process_id": "mask_scl_dilation",
+        "arguments": {
+          "data": {
+            "from_node": "mergecubes3"
+          },
+          "erosion_kernel_size": 3,
+          "kernel1_size": 17,
+          "kernel2_size": 77,
+          "mask1_values": [
+            2,
+            4,
+            5,
+            6,
+            7
+          ],
+          "mask2_values": [
+            3,
+            8,
+            9,
+            10,
+            11
+          ],
+          "scl_band_name": "SCL"
+        }
+      },
+      "filterbands3": {
+        "process_id": "filter_bands",
+        "arguments": {
+          "bands": [
+            "FAPAR"
+          ],
+          "data": {
+            "from_node": "maskscldilation3"
+          }
+        }
+      },
+      "eq1": {
+        "process_id": "eq",
+        "arguments": {
+          "case_sensitive": false,
+          "x": "NDVI",
+          "y": "fapar"
+        }
+      },
+      "if1": {
+        "process_id": "if",
+        "arguments": {
+          "accept": {
+            "from_node": "filterbands3"
+          },
+          "reject": null,
+          "value": {
+            "from_node": "eq1"
+          }
+        }
+      },
+      "eq2": {
+        "process_id": "eq",
+        "arguments": {
+          "case_sensitive": false,
+          "x": "NDVI",
+          "y": "fcover"
+        }
+      },
+      "if2": {
+        "process_id": "if",
+        "arguments": {
+          "accept": {
+            "from_node": "filterbands2"
+          },
+          "reject": {
+            "from_node": "if1"
+          },
+          "value": {
+            "from_node": "eq2"
+          }
+        }
+      },
+      "mergecubes4": {
+        "process_id": "merge_cubes",
+        "arguments": {
+          "cube1": {
+            "from_node": "if2"
+          },
+          "cube2": {
+            "from_node": "filterbands1"
+          }
+        }
+      },
+      "eq3": {
+        "process_id": "eq",
+        "arguments": {
+          "case_sensitive": false,
+          "x": "NDVI",
+          "y": "ndvi"
+        }
+      },
+      "if3": {
+        "process_id": "if",
+        "arguments": {
+          "accept": {
+            "from_node": "filterbands1"
+          },
+          "reject": {
+            "from_node": "mergecubes4"
+          },
+          "value": {
+            "from_node": "eq3"
+          }
+        }
+      },
+      "filterspatial2": {
+        "process_id": "filter_spatial",
+        "arguments": {
+          "data": {
+            "from_node": "if3"
+          },
+          "geometries": {
+            "from_node": "vectorbuffer1"
+          }
+        }
+      },
+      "resamplecubespatial1": {
+        "process_id": "resample_cube_spatial",
+        "arguments": {
+          "data": {
+            "from_node": "filterspatial1"
+          },
+          "target": {
+            "from_node": "filterspatial2"
+          }
+        }
+      },
+      "mergecubes5": {
+        "process_id": "merge_cubes",
+        "arguments": {
+          "cube1": {
+            "from_node": "resamplecubespatial1"
+          },
+          "cube2": {
+            "from_node": "filterspatial2"
+          }
+        }
+      },
+      "applyneighborhood1": {
+        "process_id": "apply_neighborhood",
+        "arguments": {
+          "data": {
+            "from_node": "mergecubes5"
+          },
+          "overlap": [
+            {
+              "dimension": "x",
+              "value": 8.0,
+              "unit": "px"
+            },
+            {
+              "dimension": "y",
+              "value": 8.0,
+              "unit": "px"
+            }
+          ],
+          "process": {
+            "process_graph": {
+              "runudf1": {
+                "process_id": "run_udf",
+                "arguments": {
+                  "context": {
+                    "startdate": "2023-06-01",
+                    "enddate": "2023-06-10",
+                    "output": "NDVI"
+                  },
+                  "data": {
+                    "from_parameter": "data"
+                  },
+                  "runtime": "Python"
+                },
+                "result": true
+              }
+            }
+          },
+          "size": [
+            {
+              "dimension": "x",
+              "value": 112.0,
+              "unit": "px"
+            },
+            {
+              "dimension": "y",
+              "value": 112.0,
+              "unit": "px"
+            }
+          ]
+        }
+      },
+      "filterspatial3": {
+        "process_id": "filter_spatial",
+        "arguments": {
+          "data": {
+            "from_node": "applyneighborhood1"
+          },
+          "geometries": {
+            "type": "FeatureCollection",
+            "features": [
+              {
+                "type": "Feature",
+                "properties": {},
+                "geometry": {
+                  "coordinates": [
+                    [
+                      [
+                        5.179217723264486,
+                        51.24988911287846
+                      ],
+                      [
+                        5.178577686573021,
+                        51.24674870133239
+                      ],
+                      [
+                        5.185205163282291,
+                        51.24499101114779
+                      ],
+                      [
+                        5.186732992804082,
+                        51.24528827229568
+                      ],
+                      [
+                        5.187331736805447,
+                        51.249230031940186
+                      ],
+                      [
+                        5.179217723264486,
+                        51.24988911287846
+                      ]
+                    ]
+                  ],
+                  "type": "Polygon"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "renamelabels3": {
+        "process_id": "rename_labels",
+        "arguments": {
+          "data": {
+            "from_node": "filterspatial3"
+          },
+          "dimension": "bands",
+          "target": [
+            "NDVI"
+          ]
+        },
+        "result": true
+      }
+    }
+  },
+  "title": null,
+  "description": null,
+  "status": "created",
+  "created": "2024-01-24T08:00:00Z",
+  "updated": "2024-01-24T08:00:00Z",
+  "job_options": null,
+  "parent_id": null,
+  "application_id": null,
+  "api_version": null,
+  "costs": 1234
+}
