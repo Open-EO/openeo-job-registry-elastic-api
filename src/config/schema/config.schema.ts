@@ -116,4 +116,15 @@ export const schema: convict.Schema<AppConfig> = {
       arg: 'throttle_limit',
     },
   },
+  health: {
+    es: {
+      timeout: {
+        doc: 'Timeout in milliseconds for ES health checks',
+        format: 'Number',
+        default: 500,
+        env: 'HEALTH_ES_TIMEOUT',
+        arg: 'health_es_teimout',
+      },
+    },
+  },
 };

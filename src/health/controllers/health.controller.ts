@@ -1,4 +1,10 @@
-import { Controller, Get, Headers } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Headers,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { HealthCheck, HealthCheckService } from '@nestjs/terminus';
 import { Public } from '../../auth/decorators/public.decorator';
 import { ConfigService } from '../../config/config/config.service';
@@ -13,6 +19,7 @@ export class HealthController {
     private configService: ConfigService,
     private authIndicator: AuthIndicator,
     private elasticSearchIndicator: ElasticsearchIndicator,
+    private logger: Logger,
   ) {}
 
   @Get()
@@ -34,11 +41,17 @@ export class HealthController {
         delete result.info[check];
       }
     }
-
-    return {
+    const isHealthy = Object.keys(result.error || {}).length === 0;
+    const response = {
       ...result,
-      status: Object.keys(result.error || {}).length > 0 ? 'error' : 'ok',
+      status: isHealthy ? 'ok' : 'error',
       details: {},
     };
+
+    if (!isHealthy) {
+      this.logger.error(`Health check failed: ${JSON.stringify(response)}`);
+      throw new ServiceUnavailableException(response);
+    }
+    return response;
   }
 }

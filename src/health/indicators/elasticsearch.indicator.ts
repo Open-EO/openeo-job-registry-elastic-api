@@ -4,14 +4,19 @@ import {
   HealthIndicatorResult,
   HttpHealthIndicator,
 } from '@nestjs/terminus';
+import { ConfigService } from '../../config/config/config.service';
 
 @Injectable()
 export class ElasticsearchIndicator extends HealthIndicator {
+  private TIMEOUT: number;
+
   constructor(
     private httpHealthIndicator: HttpHealthIndicator,
+    private configService: ConfigService,
     private logger: Logger,
   ) {
     super();
+    this.TIMEOUT = this.configService.get('health.es.timeout');
   }
 
   private async isESNodeHealthy(
@@ -22,7 +27,7 @@ export class ElasticsearchIndicator extends HealthIndicator {
         node,
         `${node}/_cluster/health`,
         {
-          timeout: 1000,
+          timeout: this.TIMEOUT,
         },
       );
       if (checkResult[node].status === 'down') {
@@ -36,7 +41,7 @@ export class ElasticsearchIndicator extends HealthIndicator {
           return response.data && response.data['status'] === 'green';
         },
         {
-          timeout: 1000,
+          timeout: this.TIMEOUT,
         },
       );
       if (checkResult[node].status === 'down') {
