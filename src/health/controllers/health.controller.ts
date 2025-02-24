@@ -1,10 +1,4 @@
-import {
-  Controller,
-  Get,
-  Headers,
-  Logger,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { Controller, Get, Headers } from '@nestjs/common';
 import { HealthCheck, HealthCheckService } from '@nestjs/terminus';
 import { Public } from '../../auth/decorators/public.decorator';
 import { ConfigService } from '../../config/config/config.service';
@@ -19,7 +13,6 @@ export class HealthController {
     private configService: ConfigService,
     private authIndicator: AuthIndicator,
     private elasticSearchIndicator: ElasticsearchIndicator,
-    private logger: Logger,
   ) {}
 
   @Get()
