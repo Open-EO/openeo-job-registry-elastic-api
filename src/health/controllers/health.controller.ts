@@ -26,32 +26,17 @@ export class HealthController {
   @HealthCheck()
   @Public()
   async check(@Headers() headers: Headers) {
-    const requiredChecks = ['elasticsearch'];
-    const result = await this.health.check([
-      () =>
-        this.elasticSearchIndicator.isHealthy(
-          this.configService.get('database.hosts').split(','),
-        ),
-      () => this.authIndicator.isHealthy(headers),
-    ]);
-
-    for (const check of requiredChecks) {
-      if (result.info[check] && result.info[check].status === 'down') {
-        result.error[check] = result.info[check];
-        delete result.info[check];
-      }
-    }
-    const isHealthy = Object.keys(result.error || {}).length === 0;
-    const response = {
-      ...result,
-      status: isHealthy ? 'ok' : 'error',
-      details: {},
-    };
-
-    if (!isHealthy) {
-      this.logger.error(`Health check failed: ${JSON.stringify(response)}`);
-      throw new ServiceUnavailableException(response);
-    }
-    return response;
+    return await this.health
+      .check([
+        () =>
+          this.elasticSearchIndicator.isHealthy(
+            this.configService.get('database.hosts').split(','),
+          ),
+        () => this.authIndicator.isHealthy(headers),
+      ])
+      .then((result) => ({
+        ...result,
+        details: {},
+      }));
   }
 }
