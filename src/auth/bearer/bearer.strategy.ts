@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-http-bearer';
 import { ConfigService } from '../../config/config/config.service';
 import { Client, custom, IntrospectionResponse, Issuer } from 'openid-client';
+import { UtilsService } from '../../utils/services/utils/utils.service';
 
 export enum VERIFICATION_ERRORS {
   NO_CLIENT = 'no_client',
@@ -33,7 +34,7 @@ export class BearerStrategy extends PassportStrategy(Strategy, 'bearer') {
   logger: Logger;
 
   constructor(client: Client) {
-    super({}, (token, verified) => this.verify(token, verified, 3));
+    super({}, (token, verified) => this.verify(token, verified, 5));
     this.client = client;
     this.logger = new Logger('BearerStrategy');
   }
@@ -52,6 +53,7 @@ export class BearerStrategy extends PassportStrategy(Strategy, 'bearer') {
       if (introspectResult.error !== VERIFICATION_ERRORS.GENERAL) {
         break;
       }
+      await UtilsService.sleep(1000);
       attempt += 1;
     }
 
