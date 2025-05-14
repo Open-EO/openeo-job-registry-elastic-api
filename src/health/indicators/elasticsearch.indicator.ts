@@ -10,6 +10,7 @@ import { ConfigService } from '../../config/config/config.service';
 @Injectable()
 export class ElasticsearchIndicator extends HealthIndicator {
   private TIMEOUT: number;
+  private readonly HEALTH_ENDPOINT = '/cluster/health/marketplace*?pretty';
 
   constructor(
     private httpHealthIndicator: HttpHealthIndicator,
@@ -26,7 +27,7 @@ export class ElasticsearchIndicator extends HealthIndicator {
     try {
       let checkResult = await this.httpHealthIndicator.pingCheck(
         node,
-        `${node}/_cluster/health`,
+        `${node}${this.HEALTH_ENDPOINT}`,
         {
           timeout: this.TIMEOUT,
         },
@@ -37,9 +38,12 @@ export class ElasticsearchIndicator extends HealthIndicator {
 
       checkResult = await this.httpHealthIndicator.responseCheck(
         node,
-        `${node}/_cluster/health`,
+        `${node}${this.HEALTH_ENDPOINT}`,
         (response) => {
-          return response.data && response.data['status'] === 'green';
+          return (
+            response.data &&
+            ['green', 'yellow'].includes(response.data['status'])
+          );
         },
         {
           timeout: this.TIMEOUT,
