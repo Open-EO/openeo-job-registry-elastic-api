@@ -10,7 +10,7 @@ import { ConfigService } from '../../config/config/config.service';
 @Injectable()
 export class ElasticsearchIndicator extends HealthIndicator {
   private TIMEOUT: number;
-  private readonly HEALTH_ENDPOINT = '/cluster/health/marketplace*?pretty';
+  private readonly HEALTH_ENDPOINT = `/_cluster/health/${process.env.DB_JOBS_IDX}?pretty`;
 
   constructor(
     private httpHealthIndicator: HttpHealthIndicator,
