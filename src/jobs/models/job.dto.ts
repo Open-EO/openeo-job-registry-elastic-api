@@ -139,7 +139,7 @@ export class PatchJob {
 
   @IsOptional()
   @ApiProperty({
-    description: 'The URI reference to the metadata of the job',
+    description: 'The URI reference to the results metadata of the job',
     required: false,
   })
   results_metadata_uri?: string;
