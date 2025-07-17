@@ -130,10 +130,19 @@ export class PatchJob {
 
   @IsOptional()
   @ApiProperty({
-    description: 'Metadata about the batch job results and assets',
+    description:
+      '(Deprecated, use results_metadata_uri instead) Metadata about the batch job results and assets',
     required: false,
+    deprecated: true,
   })
   results_metadata?: any;
+
+  @IsOptional()
+  @ApiProperty({
+    description: 'The URI reference to the metadata of the job',
+    required: false,
+  })
+  results_metadata_uri?: string;
 
   @IsOptional()
   @ApiProperty({

@@ -89,6 +89,9 @@
       },
       "results_metadata": {
         "type": "object"
+      },
+      "results_metadata_uri": {
+        "type": "keyword"
       }
     }
   }
