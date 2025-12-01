@@ -146,6 +146,13 @@ export class PatchJob {
 
   @IsOptional()
   @ApiProperty({
+    description: 'Input pixel processed by the job',
+    required: false,
+  })
+  input_pixel?: number;
+
+  @IsOptional()
+  @ApiProperty({
     description: 'Total cost of the job',
     required: false,
   })

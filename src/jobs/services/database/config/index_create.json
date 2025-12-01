@@ -92,6 +92,9 @@
       },
       "results_metadata_uri": {
         "type": "keyword"
+      },
+      "input_pixel": {
+        "type": "double"
       }
     }
   }
