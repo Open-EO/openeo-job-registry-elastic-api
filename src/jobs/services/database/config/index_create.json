@@ -95,6 +95,9 @@
       },
       "input_pixel": {
         "type": "double"
+      },
+      "costs": {
+        "type": "double"
       }
     }
   }
