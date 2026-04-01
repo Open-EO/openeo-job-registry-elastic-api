@@ -12,7 +12,9 @@
         "type": "keyword"
       },
       "assets": {
-        "type": "object"
+        "type": "flattened",
+        "index": false,
+        "doc_values": false
       },
       "backend_id": {
         "type": "keyword"
