@@ -1,104 +1,115 @@
 {
-  "settings": {
-    "index": {
-      "number_of_shards": "1",
-      "number_of_replicas": "1"
-    }
-  },
   "aliases": {
     "openeo-jobs-dev": {}
   },
   "mappings": {
+    "dynamic": false,
     "properties": {
-      "job_id": {
-        "type": "keyword"
-      },
-      "parent_id": {
-        "type": "keyword"
-      },
-      "user_id": {
-        "type": "keyword"
-      },
-      "proxy_user": {
-        "type": "keyword"
-      },
-      "status": {
-        "type": "keyword"
-      },
       "api_version": {
         "type": "text"
       },
-      "specification": {
-        "type": "object"
-      },
       "application_id": {
-        "type": "keyword"
-      },
-      "created": {
-        "type": "date"
-      },
-      "updated": {
-        "type": "date"
-      },
-      "started": {
-        "type": "date"
-      },
-      "finished": {
-        "type": "date"
-      },
-      "title": {
-        "type": "text"
-      },
-      "description": {
-        "type": "text"
-      },
-      "dependencies": {
-        "type": "nested",
-        "properties": {
-          "collection_id": {
-            "type": "keyword"
-          },
-          "batch_request_ids": {
-            "type": "keyword"
-          },
-          "results_location": {
-            "type": "keyword"
-          },
-          "card4l": {
-            "type": "boolean"
-          }
-        }
-      },
-      "dependency_status": {
-        "type": "keyword"
-      },
-      "links": {
         "type": "keyword"
       },
       "assets": {
         "type": "object"
       },
-      "unique_service_ids": {
+      "backend_id": {
         "type": "keyword"
       },
-      "usage": {
-        "type": "object"
+      "costs": {
+        "type": "double"
       },
-      "job_options": {
-        "type": "object"
+      "created": {
+        "type": "date"
       },
-      "results_metadata": {
-        "type": "object"
+      "deleted": {
+        "type": "boolean"
       },
-      "results_metadata_uri": {
+      "dependencies": {
+        "type": "flattened",
+        "index": false,
+        "doc_values": false
+      },
+      "dependency_status": {
         "type": "keyword"
+      },
+      "dependency_usage": {
+        "type": "keyword"
+      },
+      "description": {
+        "type": "text"
+      },
+      "finished": {
+        "type": "date"
       },
       "input_pixel": {
         "type": "double"
       },
-      "costs": {
-        "type": "double"
+      "job_id": {
+        "type": "keyword"
+      },
+      "job_options": {
+        "type": "flattened",
+        "index": false,
+        "doc_values": false
+      },
+      "links": {
+        "type": "keyword"
+      },
+      "parent_id": {
+        "type": "keyword"
+      },
+      "process": {
+        "type": "flattened",
+        "index": false,
+        "doc_values": false
+      },
+      "proxy_user": {
+        "type": "keyword"
+      },
+      "results_metadata": {
+        "type": "flattened",
+        "index": false,
+        "doc_values": false
+      },
+      "results_metadata_uri": {
+        "type": "keyword"
+      },
+      "specification": {
+        "type": "flattened",
+        "index": false,
+        "doc_values": false
+      },
+      "started": {
+        "type": "date"
+      },
+      "status": {
+        "type": "keyword"
+      },
+      "title": {
+        "type": "text"
+      },
+      "unique_service_ids": {
+        "type": "keyword"
+      },
+      "updated": {
+        "type": "date"
+      },
+      "usage": {
+        "type": "flattened",
+        "index": false,
+        "doc_values": false
+      },
+      "user_id": {
+        "type": "keyword"
       }
+    }
+  },
+  "settings": {
+    "index": {
+      "number_of_replicas": "1",
+      "number_of_shards": "1"
     }
   }
 }
