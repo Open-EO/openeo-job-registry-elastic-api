@@ -4,6 +4,7 @@ import { Strategy } from 'passport-http-bearer';
 import { ConfigService } from '../../config/config/config.service';
 import { Client, custom, IntrospectionResponse, Issuer } from 'openid-client';
 import { UtilsService } from '../../utils/services/utils/utils.service';
+import { CachingService } from '../../caching/services/cache.service';
 
 export enum VERIFICATION_ERRORS {
   NO_CLIENT = 'no_client',
@@ -32,17 +33,37 @@ export const buildBearerClient = async (configService: ConfigService) => {
 export class BearerStrategy extends PassportStrategy(Strategy, 'bearer') {
   client: Client;
   logger: Logger;
+  cachingService: CachingService;
 
-  constructor(client: Client) {
+  constructor(client: Client, cachingService: CachingService) {
     super({}, (token, verified) => this.verify(token, verified, 5));
     this.client = client;
+    this.cachingService = cachingService;
     this.logger = new Logger('BearerStrategy');
   }
+
+  private getCacheKey(token: string): string {
+    return `bearer:${token}`;
+  }
+
   public async verify(
     token: string,
     verified: (error, user, info) => void,
     attempts: number,
   ) {
+    const cacheKey = this.getCacheKey(token);
+    const cachedResult = await this.cachingService.checkCache<{
+      error?: VERIFICATION_ERRORS;
+      user?: any;
+      info?: string;
+    }>(cacheKey);
+
+    if (cachedResult !== undefined) {
+      this.logger.debug('Token found in cache, skipping introspection');
+      verified(cachedResult.error, cachedResult.user, cachedResult.info);
+      return;
+    }
+
     let attempt = 1;
     let introspectResult;
 
@@ -55,6 +76,10 @@ export class BearerStrategy extends PassportStrategy(Strategy, 'bearer') {
       }
       await UtilsService.sleep(1000);
       attempt += 1;
+    }
+
+    if (!introspectResult.error && introspectResult.user) {
+      await this.cachingService.store(cacheKey, introspectResult);
     }
 
     verified(
