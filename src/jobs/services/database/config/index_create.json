@@ -12,9 +12,8 @@
         "type": "keyword"
       },
       "assets": {
-        "type": "flattened",
-        "index": false,
-        "doc_values": false
+        "type": "object",
+        "enabled": false
       },
       "backend_id": {
         "type": "keyword"
@@ -29,9 +28,8 @@
         "type": "boolean"
       },
       "dependencies": {
-        "type": "flattened",
-        "index": false,
-        "doc_values": false
+        "type": "object",
+        "enabled": false
       },
       "dependency_status": {
         "type": "keyword"
@@ -40,7 +38,8 @@
         "type": "keyword"
       },
       "description": {
-        "type": "text"
+        "type": "object",
+        "enabled": false
       },
       "finished": {
         "type": "date"
@@ -52,9 +51,8 @@
         "type": "keyword"
       },
       "job_options": {
-        "type": "flattened",
-        "index": false,
-        "doc_values": false
+        "type": "object",
+        "enabled": false
       },
       "links": {
         "type": "keyword"
@@ -63,25 +61,22 @@
         "type": "keyword"
       },
       "process": {
-        "type": "flattened",
-        "index": false,
-        "doc_values": false
+        "type": "object",
+        "enabled": false
       },
       "proxy_user": {
         "type": "keyword"
       },
       "results_metadata": {
-        "type": "flattened",
-        "index": false,
-        "doc_values": false
+        "type": "object",
+        "enabled": false
       },
       "results_metadata_uri": {
         "type": "keyword"
       },
       "specification": {
-        "type": "flattened",
-        "index": false,
-        "doc_values": false
+        "type": "object",
+        "enabled": false
       },
       "started": {
         "type": "date"
@@ -99,9 +94,8 @@
         "type": "date"
       },
       "usage": {
-        "type": "flattened",
-        "index": false,
-        "doc_values": false
+        "type": "object",
+        "enabled": false
       },
       "user_id": {
         "type": "keyword"
@@ -111,7 +105,7 @@
   "settings": {
     "index": {
       "number_of_replicas": "1",
-      "number_of_shards": "1"
+      "number_of_shards": "3"
     }
   }
 }
