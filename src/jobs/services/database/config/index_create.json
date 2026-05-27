@@ -109,7 +109,7 @@
       "infra_id": {
         "type": "keyword"
       },
-      "oidc_issuer_url": {
+      "oidc_issuer": {
         "type": "keyword"
       }
     }

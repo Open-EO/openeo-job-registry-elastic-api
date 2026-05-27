@@ -170,7 +170,7 @@ export class PatchJob {
     description: 'OIDC issuer URL set when a job gets created. This is used to make sure the user id is better qualified.',
     required: false,
   })
-  oidc_issuer_url?: string;
+  oidc_issuer?: string;
 }
 
 export class ExtendedPatchJob extends PatchJob {
