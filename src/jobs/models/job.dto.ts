@@ -157,6 +157,20 @@ export class PatchJob {
     required: false,
   })
   costs?: number;
+
+  @IsOptional()
+  @ApiProperty({
+    description: 'Unique identifier of the infrastructure on which a job executes',
+    required: false,
+  })
+  infra_id?: string;
+
+  @IsOptional()
+  @ApiProperty({
+    description: 'OIDC issuer URL set when a job gets created. This is used to make sure the user id is better qualified.',
+    required: false,
+  })
+  oidc_issuer_url?: string;
 }
 
 export class ExtendedPatchJob extends PatchJob {
