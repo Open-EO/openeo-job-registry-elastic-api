@@ -105,6 +105,12 @@
       },
       "user_id": {
         "type": "keyword"
+      },
+      "infra_id": {
+        "type": "keyword"
+      },
+      "oidc_issuer": {
+        "type": "keyword"
       }
     }
   },
