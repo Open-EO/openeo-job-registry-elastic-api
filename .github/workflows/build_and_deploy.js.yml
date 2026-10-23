@@ -51,35 +51,48 @@ jobs:
           echo "docker_version=${version}" >> $GITHUB_OUTPUT
     outputs:
       docker_version: ${{ steps.version.outputs.docker_version }}
-
+      
   deploy:
     needs: release
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/openeo-job-registry-elastic-api
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
       - name: Use Node.js 18.x
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.x
-          cache: 'npm'
-      - name: Update package.json
-        id: version
-        run: |
-          sed -i "s/0.0.0-semver/${{needs.release.outputs.docker_version}}/g" package.json
-      - run: npm install
-      - name: Login to Docker repository
-        uses: docker/login-action@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          registry: ${{ secrets.DOCKER_ARTIFACTORY }}
-          username: ${{ secrets.ARTIFACTORY_USERNAME }}
-          password: ${{ secrets.ARTIFACTORY_PASSWORD }}
-      - name: Build image
-        run: docker build -t $DOCKER_IMAGE_NAME .
-      - name: Tag image
-        run: docker tag $DOCKER_IMAGE_NAME ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:${{needs.release.outputs.docker_version}} && docker tag $DOCKER_IMAGE_NAME  ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:latest
-      - name: Push image
-        run: docker push ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:${{needs.release.outputs.docker_version}} && docker push ${{ secrets.DOCKER_ARTIFACTORY }}/$DOCKER_IMAGE_NAME:latest
+          cache: npm
 
+      - name: Update package.json
+        run: |
+          sed -i "s/0.0.0-semver/${{ needs.release.outputs.docker_version }}/g" package.json
+
+      - run: npm install
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image
+        run: docker build -t "$IMAGE_NAME" .
+
+      - name: Tag image
+        run: |
+          docker tag "$IMAGE_NAME" "$IMAGE_NAME:${{ needs.release.outputs.docker_version }}"
+          docker tag "$IMAGE_NAME" "$IMAGE_NAME:latest"
+
+      - name: Push image
+        run: |
+          docker push "$IMAGE_NAME:${{ needs.release.outputs.docker_version }}"
+          docker push "$IMAGE_NAME:latest"
