@@ -47,6 +47,11 @@ $ npm run start:prod
 
 ## Test
 
+HTTP logs omit request headers and query strings and redact response cookies.
+Bearer verification logs status only, not tokens, introspection payloads or
+remote error details. Query-string tokens remain supported for compatibility,
+but callers should prefer the `Authorization` header.
+
 ```bash
 # unit tests
 $ npm run test
