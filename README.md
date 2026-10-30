@@ -45,43 +45,6 @@ $ npm run start:dev
 $ npm run start:prod
 ```
 
-## Elasticsearch authentication and health probes
-
-`DB_HOSTS` retains its existing comma-separated endpoint configuration. Optionally
-set `DB_API_KEY` to an **encoded Elasticsearch data-plane API key** delivered by
-your secret manager. API-key mode requires HTTPS for every host and rejects
-embedded URL credentials. An Elastic Cloud control-plane key is not a database
-credential. Never put secrets in committed configuration or command arguments.
-
-Publicly trusted TLS certificates use Node's default CA trust. For a private CA,
-set `DB_CA_FILE` to a mounted PEM bundle. Certificate verification is never
-disabled. Both options default to empty, preserving existing connection settings.
-This change retains the existing Elasticsearch 7.17 client and supported runtime;
-it does not claim Elasticsearch 8/9 compatibility or change query/sort semantics.
-
-Jobs and health checks share the same configured Elasticsearch client, including
-API-key authentication and TLS trust:
-
-| Endpoint | Purpose | Dependencies / privileges |
-|---|---|---|
-| `/health/live` | Startup / liveness | Process only |
-| `/health/ready` | Readiness | Authenticated size-zero search on `DB_JOBS_IDX`; index read privilege |
-| `/health` | Existing diagnostic | Cluster health (green/yellow) and supplied bearer-token introspection |
-
-The new probes need no bearer token and bypass request throttling. Keep their
-network exposure internal. Database failure returns readiness 503 without causing
-a liveness restart loop. `HEALTH_ES_TIMEOUT` bounds database checks, with client
-retries disabled for probes. `/health` retains its cluster-health requirement,
-including Elasticsearch cluster-monitor privileges; it now uses the authenticated
-client pool rather than unauthenticated per-host HTTP calls. Failed health checks
-return a generic down status without serializing endpoint/credential details.
-Job database errors likewise retain HTTP 500 but use generic messages instead of
-returning or logging credential-bearing transport objects or remote error details.
-
-Create index mappings separately using the existing index definition. Runtime
-credentials need only the application's index read/write privileges; index
-bootstrap and optional cluster diagnostics can use separately granted privileges.
-
 ## Test
 
 ```bash

@@ -69,19 +69,6 @@ export const schema: convict.Schema<AppConfig> = {
     },
   },
   database: {
-    apiKey: {
-      doc: 'Encoded Elasticsearch data-plane API key; requires HTTPS hosts',
-      format: 'String',
-      default: '',
-      env: 'DB_API_KEY',
-      sensitive: true,
-    },
-    caFile: {
-      doc: 'Optional path to a PEM CA bundle for Elasticsearch TLS',
-      format: 'String',
-      default: '',
-      env: 'DB_CA_FILE',
-    },
     hosts: {
       doc: 'Comma seperated value list of elasticsearch hosts to use',
       format: '*',
