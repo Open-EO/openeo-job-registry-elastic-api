@@ -4,7 +4,10 @@ import { AuthModule } from './auth/auth.module';
 import { JobsModule } from './jobs/jobs.module';
 import { HealthModule } from './health/health.module';
 import { UtilsModule } from './utils/utils.module';
-import { LoggerMiddleware } from './middleware/logger.middleware';
+import {
+  httpLogOptions,
+  LoggerMiddleware,
+} from './middleware/logger.middleware';
 import { ConfigService } from './config/config/config.service';
 import { LoggerModule } from 'nestjs-pino';
 import { v4 as uuidv4 } from 'uuid';
@@ -26,6 +29,7 @@ import { APP_GUARD } from '@nestjs/core';
         return {
           level: config.get('general.loglevel'),
           pinoHttp: {
+            ...httpLogOptions,
             level: config.get('general.loglevel'),
             genReqId: (request) =>
               request.headers['x-correlation-id'] || uuidv4(),
