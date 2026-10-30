@@ -47,6 +47,30 @@ describe('DatabaseService', () => {
     expect(service).toBeDefined();
   });
 
+  it('does not expose credentials in database errors or logs', async () => {
+    const logger = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    const failure = () => {
+      throw new Error('ApiKey request-secret');
+    };
+    try {
+      jest.spyOn(esService, 'index').mockImplementation(failure);
+      jest.spyOn(esService, 'update').mockImplementation(failure);
+      jest.spyOn(esService, 'search').mockImplementation(failure);
+      await expect(service.saveJobs(JOB)).rejects.toThrow(
+        'Elasticsearch request failed',
+      );
+      await expect(service.patchJob('doc', JOB)).rejects.toThrow(
+        'Elasticsearch request failed',
+      );
+      await expect(service.executeJobQuery(QUERIES[1].input)).rejects.toThrow(
+        'Elasticsearch request failed',
+      );
+      expect(JSON.stringify(logger.mock.calls)).not.toContain('request-secret');
+    } finally {
+      logger.mockRestore();
+    }
+  });
+
   it('should save jobs in bulk', async () => {
     const es = jest.spyOn(esService, 'index').mockReturnValueOnce({
       statusCode: 201,

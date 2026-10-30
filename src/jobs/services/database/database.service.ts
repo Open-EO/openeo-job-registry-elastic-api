@@ -42,11 +42,8 @@ export class DatabaseService {
         );
       }
       return job;
-    } catch (error: any) {
-      let message = error.toString();
-      if (error.constructor.name === 'ResponseError') {
-        message = `${error.meta.body.error.type} - ${error.meta.body.error.reason}`;
-      }
+    } catch {
+      const message = 'Elasticsearch request failed';
       this.logger.error(
         `Could not store job ${job.job_id} in elasticsearch: ${message}`,
       );
@@ -127,16 +124,26 @@ export class DatabaseService {
       query = this.addDeletedFilter(query);
     }
     // Perform initial search
-    const { body } = await this.elasticSearch.search({
-      index: this.JOBS_INDEX,
-      track_total_hits: false,
-      body: {
-        ...query,
-      },
-      from,
-      size,
-      sort: ['created:desc', '_id:asc'],
-    });
+    let response: ApiResponse<Record<string, any>>;
+    try {
+      response = await this.elasticSearch.search({
+        index: this.JOBS_INDEX,
+        track_total_hits: false,
+        body: {
+          ...query,
+        },
+        from,
+        size,
+        sort: ['created:desc', '_id:asc'],
+      });
+    } catch {
+      this.logger.error('Elasticsearch job query failed');
+      throw new HttpException(
+        'Could not query jobs in database: Elasticsearch request failed',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+    const { body } = response;
 
     jobs = [
       ...jobs,
@@ -171,11 +178,8 @@ export class DatabaseService {
         id: docId,
       });
       return updated.body._source as Job;
-    } catch (error: any) {
-      let message = error.toString();
-      if (error.constructor.name === 'ResponseError') {
-        message = `${error.meta.body.error.type} - ${error.meta.body.error.reason}`;
-      }
+    } catch {
+      const message = 'Elasticsearch request failed';
       this.logger.error(
         `Could not update job ${docId} in elasticsearch: ${message}`,
       );

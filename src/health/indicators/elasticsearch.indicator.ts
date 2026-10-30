@@ -1,91 +1,62 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ElasticsearchService } from '@nestjs/elasticsearch';
 import {
   HealthCheckError,
   HealthIndicator,
   HealthIndicatorResult,
-  HttpHealthIndicator,
 } from '@nestjs/terminus';
 import { ConfigService } from '../../config/config/config.service';
 
 @Injectable()
 export class ElasticsearchIndicator extends HealthIndicator {
-  private TIMEOUT: number;
-  private readonly HEALTH_ENDPOINT = `/_cluster/health/${process.env.DB_JOBS_IDX}?pretty`;
-
   constructor(
-    private httpHealthIndicator: HttpHealthIndicator,
-    private configService: ConfigService,
-    private logger: Logger,
+    private readonly client: ElasticsearchService,
+    private readonly configService: ConfigService,
+    private readonly logger: Logger,
   ) {
     super();
-    this.TIMEOUT = this.configService.get('health.es.timeout');
   }
 
-  private async isESNodeHealthy(
-    node: string,
-  ): Promise<{ node: string; healthy: boolean; message?: string }> {
+  async isHealthy(): Promise<HealthIndicatorResult> {
     try {
-      let checkResult = await this.httpHealthIndicator.pingCheck(
-        node,
-        `${node}${this.HEALTH_ENDPOINT}`,
-        {
-          timeout: this.TIMEOUT,
-        },
+      const { body } = await this.client.cluster.health(
+        { index: this.configService.get('database.jobsIdx') },
+        this.requestOptions(),
       );
-      if (checkResult[node].status === 'down') {
-        throw Error(`Could not execute ping to ${node}`);
+      if (!['green', 'yellow'].includes(body.status)) {
+        throw new Error('Elasticsearch cluster is not healthy');
       }
-
-      checkResult = await this.httpHealthIndicator.responseCheck(
-        node,
-        `${node}${this.HEALTH_ENDPOINT}`,
-        (response) => {
-          return (
-            response.data &&
-            ['green', 'yellow'].includes(response.data['status'])
-          );
-        },
-        {
-          timeout: this.TIMEOUT,
-        },
-      );
-      if (checkResult[node].status === 'down') {
-        throw Error(`Could not execute ping to ${node}`);
-      }
-      return {
-        node,
-        healthy: true,
-      };
-    } catch (e) {
-      this.logger.error(`Could not perform ping check for host ${node}: ${e}`);
-      return {
-        healthy: false,
-        node,
-        message: e.toString(),
-      };
+      return this.getStatus('elasticsearch', true);
+    } catch {
+      this.unavailable('Elasticsearch health check failed');
     }
   }
 
-  async isHealthy(nodes: string[]): Promise<HealthIndicatorResult> {
-    const results = await Promise.all(
-      nodes.map((node) => this.isESNodeHealthy(node)),
-    );
-
-    const isAnyHealthy = results.some((r) => r.healthy);
-    const messages = results
-      .filter((r) => !!r.message)
-      .map((r) => `${r.node} - ${r.message}`);
-
-    if (!isAnyHealthy) {
-      throw new HealthCheckError('All elasticsearch nodes are down', {
-        elasticsearch: {
-          errors: messages,
-        },
-      });
+  async isReady(): Promise<HealthIndicatorResult> {
+    try {
+      // Readiness needs only the configured index's read privilege.
+      await this.client.search(
+        { index: this.configService.get('database.jobsIdx'), size: 0 },
+        this.requestOptions(),
+      );
+      return this.getStatus('elasticsearch', true);
+    } catch {
+      this.unavailable('Elasticsearch readiness check failed');
     }
+  }
 
-    return this.getStatus('elasticsearch', isAnyHealthy, {
-      warnings: messages.length > 0 ? messages : undefined,
+  private requestOptions() {
+    return {
+      requestTimeout: this.configService.get('health.es.timeout'),
+      maxRetries: 0,
+    };
+  }
+
+  private unavailable(message: string): never {
+    // Transport errors can include credentials; do not serialize them.
+    this.logger.error(message);
+    throw new HealthCheckError('Elasticsearch unavailable', {
+      elasticsearch: { status: 'down' },
     });
   }
 }
