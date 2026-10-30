@@ -24,5 +24,6 @@ import { ThrottlerModule } from '@nestjs/throttler';
     }),
   ],
   providers: [DatabaseService, Logger],
+  exports: [ElasticsearchModule],
 })
 export class JobsModule {}
