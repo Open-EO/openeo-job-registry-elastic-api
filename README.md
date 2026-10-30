@@ -45,6 +45,25 @@ $ npm run start:dev
 $ npm run start:prod
 ```
 
+## Kubernetes probes
+
+Use `/health/live` for startup/liveness and `/health/ready` for readiness.
+Both endpoints are public and exempt from request throttling; keep network
+exposure internal.
+
+- Liveness returns `{"status":"ok"}` without contacting Elasticsearch or the
+  identity provider.
+- Readiness performs a size-zero search on `DB_JOBS_IDX` using the existing
+  job database client and configuration. It requires index read access, not
+  cluster-monitor privileges. Failures return 503 with generic diagnostic details.
+  `HEALTH_ES_TIMEOUT` bounds the request, with client retries disabled.
+- An Elasticsearch outage removes readiness but does not trigger a liveness
+  restart loop. Authentication discovery still runs during application startup.
+
+The existing `/health` endpoint and its cluster-health/token checks are unchanged.
+No database authentication settings, CA configuration, dependency changes or
+query changes are introduced.
+
 ## Test
 
 ```bash

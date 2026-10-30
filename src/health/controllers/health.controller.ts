@@ -4,6 +4,8 @@ import { Public } from '../../auth/decorators/public.decorator';
 import { ConfigService } from '../../config/config/config.service';
 import { AuthIndicator } from '../indicators/auth.indicator';
 import { ElasticsearchIndicator } from '../indicators/elasticsearch.indicator';
+import { ReadinessIndicator } from '../indicators/readiness.indicator';
+import { SkipThrottle } from '@nestjs/throttler';
 
 @Public()
 @Controller('health')
@@ -13,6 +15,7 @@ export class HealthController {
     private configService: ConfigService,
     private authIndicator: AuthIndicator,
     private elasticSearchIndicator: ElasticsearchIndicator,
+    private readinessIndicator: ReadinessIndicator,
   ) {}
 
   @Get()
@@ -31,5 +34,20 @@ export class HealthController {
         ...result,
         details: {},
       }));
+  }
+
+  @Get('live')
+  @Public()
+  @SkipThrottle()
+  live() {
+    return { status: 'ok' };
+  }
+
+  @Get('ready')
+  @Public()
+  @HealthCheck()
+  @SkipThrottle()
+  ready() {
+    return this.health.check([() => this.readinessIndicator.isHealthy()]);
   }
 }
