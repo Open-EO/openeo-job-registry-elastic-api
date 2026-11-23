@@ -169,8 +169,8 @@ export class BearerStrategy extends PassportStrategy(Strategy, 'bearer') {
           // See strategy.js for more information on the implementation
           return {
             error: null,
-            user: {},
-            info: null,
+            user: null,
+            info: VERIFICATION_ERRORS.TOKEN_INVALID,
           };
         }
       } catch (e) {
