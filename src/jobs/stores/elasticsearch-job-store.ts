@@ -18,7 +18,6 @@ import {
 @Injectable()
 export class ElasticsearchJobStore extends JobStore {
   private readonly index: string;
-  private readonly logger = new Logger(ElasticsearchJobStore.name);
 
   constructor(
     private readonly elastic: ElasticsearchService,
@@ -26,6 +25,7 @@ export class ElasticsearchJobStore extends JobStore {
   ) {
     super();
     this.index = config.get('database.jobsIdx');
+    this.logger = new Logger(ElasticsearchJobStore.name);
   }
 
   private async execute<T>(operation: () => Promise<T>): Promise<T> {
@@ -50,21 +50,18 @@ export class ElasticsearchJobStore extends JobStore {
 
   private record(
     source: JobSource,
-    metadata: { _version?: number; _seq_no?: number; _primary_term?: number },
+    metadata: { _seq_no?: number; _primary_term?: number },
   ): StoredJob {
     if (
-      !Number.isInteger(metadata._version) ||
-      metadata._version < 1 ||
       !Number.isInteger(metadata._seq_no) ||
       metadata._seq_no < 0 ||
       !Number.isInteger(metadata._primary_term) ||
       metadata._primary_term < 1
     ) {
-      throw new Error('Storage returned invalid version metadata');
+      throw new Error('Storage returned invalid concurrency metadata');
     }
     return {
       source,
-      version: metadata._version,
       concurrencyToken: JSON.stringify([
         metadata._seq_no,
         metadata._primary_term,
@@ -74,6 +71,7 @@ export class ElasticsearchJobStore extends JobStore {
 
   get(jobId: string): Promise<StoredJob> {
     return this.execute(async () => {
+      this.debug('job_store_get', jobId);
       const { body } = await this.elastic.get<estypes.GetResponse<JobSource>>({
         index: this.index,
         id: jobId,
@@ -84,11 +82,7 @@ export class ElasticsearchJobStore extends JobStore {
 
   create(source: JobSource): Promise<StoredJob> {
     return this.execute(async () => {
-      if (Buffer.byteLength(source.job_id, 'utf8') > 512) {
-        throw new JobStoreInvalidInputError(
-          'Job ID must not exceed 512 UTF-8 bytes',
-        );
-      }
+      this.debug('job_store_create', source.job_id);
       const { body } = await this.elastic.create<estypes.CreateResponse>({
         index: this.index,
         id: source.job_id,
@@ -101,6 +95,7 @@ export class ElasticsearchJobStore extends JobStore {
 
   replace(source: JobSource, concurrencyToken: string): Promise<StoredJob> {
     return this.execute(async () => {
+      this.debug('job_store_replace', source.job_id);
       const token: unknown = JSON.parse(concurrencyToken);
       if (
         !Array.isArray(token) ||
@@ -124,30 +119,36 @@ export class ElasticsearchJobStore extends JobStore {
 
   search(search: SearchJobs): Promise<StoredJobPage> {
     return this.execute(async () => {
+      this.debug('job_store_search');
       const filters = search.filters || {};
-      const filter: estypes.QueryDslQueryContainer[] = [];
-      if (filters.backend_id !== undefined) {
-        filter.push({ term: { backend_id: filters.backend_id } });
-      }
+      const termFilters = [
+        ['backend_id', filters.backend_id],
+        ['job_id', filters.job_id],
+      ] as const;
+      const termsFilters = [
+        ['user_id', filters.user_ids],
+        ['status', filters.statuses],
+      ] as const;
+      const filter: estypes.QueryDslQueryContainer[] = [
+        ...termFilters.flatMap(([field, value]) =>
+          value === undefined ? [] : [{ term: { [field]: value } }],
+        ),
+        ...termsFilters.flatMap(([field, value]) =>
+          value === undefined ? [] : [{ terms: { [field]: value } }],
+        ),
+        ...(filters.infra_id !== undefined
+          ? [{ term: { infra_id: filters.infra_id } }]
+          : []),
+        ...(filters.has_application_id
+          ? [{ exists: { field: 'application_id' } }]
+          : []),
+      ];
       const mustNot: estypes.QueryDslQueryContainer[] = [
         { term: { deleted: true } },
+        ...(filters.has_application_id === false
+          ? [{ exists: { field: 'application_id' } }]
+          : []),
       ];
-      if (filters.job_id !== undefined) {
-        filter.push({ term: { job_id: filters.job_id } });
-      }
-      if (filters.user_ids) {
-        filter.push({ terms: { user_id: filters.user_ids } });
-      }
-      if (filters.statuses) {
-        filter.push({ terms: { status: filters.statuses } });
-      }
-      if (filters.infra_id !== undefined) {
-        filter.push({ term: { infra_id: filters.infra_id } });
-      }
-      if (filters.has_application_id !== undefined) {
-        const target = filters.has_application_id ? filter : mustNot;
-        target.push({ exists: { field: 'application_id' } });
-      }
       for (const [field, since, until] of [
         ['created', filters.created_since, filters.created_until],
         ['updated', filters.updated_since, filters.updated_until],

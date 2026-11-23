@@ -113,7 +113,18 @@ describe('Domain jobs API and legacy compatibility', () => {
     );
     expect(elastic.search).not.toHaveBeenCalled();
     expect(elastic.get).not.toHaveBeenCalled();
-    expect(response.headers.etag).toMatch(/^"[a-f0-9]{64}"$/);
+    expect(response.headers.etag).toMatch(/^"[A-Za-z0-9_-]+"$/);
+    expect(response.headers.location).toBe('/v2/jobs/j-1');
+  });
+
+  it('encodes job IDs in the creation Location header', async () => {
+    const jobId = 'j/1?#';
+    const response = await request(app.getHttpServer())
+      .post(base)
+      .send({ backend_id: 'qa', job_id: jobId, user_id: 'alice' })
+      .expect(201);
+
+    expect(response.headers.location).toBe('/v2/jobs/j%2F1%3F%23');
   });
 
   it('rejects creation retries when the original creation input is unavailable', async () => {
@@ -145,17 +156,12 @@ describe('Domain jobs API and legacy compatibility', () => {
       .expect(409);
   });
 
-  it('gets an existing job by global ID with optional user scope', async () => {
-    await request(app.getHttpServer())
-      .get(`${base}/j-1?user_id=alice`)
-      .expect(200, job);
+  it('gets an existing job by global ID', async () => {
+    await request(app.getHttpServer()).get(`${base}/j-1`).expect(200, job);
     expect(elastic.get).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'j-1' }),
     );
     expect(elastic.search).not.toHaveBeenCalled();
-    await request(app.getHttpServer())
-      .get(`${base}/j-1?user_id=bob`)
-      .expect(404);
   });
 
   it('returns 404 for absent jobs and tombstones without search fallback', async () => {
@@ -170,7 +176,7 @@ describe('Domain jobs API and legacy compatibility', () => {
 
   it('updates a direct document with the client version and an atomic concurrency guard', async () => {
     await request(app.getHttpServer())
-      .patch(`${base}/j-1?user_id=alice`)
+      .patch(`${base}/j-1`)
       .set('If-Match', etag)
       .send({
         status: 'running',
@@ -198,7 +204,7 @@ describe('Domain jobs API and legacy compatibility', () => {
     );
   });
 
-  it('uses the committed storage version for mutation ETags without rereading', async () => {
+  it('returns the stored mutation ETag without rereading', async () => {
     elastic.index.mockResolvedValue({
       body: { _version: 17, _seq_no: 29, _primary_term: 3 },
     });
@@ -233,7 +239,29 @@ describe('Domain jobs API and legacy compatibility', () => {
     });
   });
 
-  it('fails explicitly when storage omits committed version metadata', async () => {
+  it('uses concurrency metadata without requiring an Elasticsearch version', async () => {
+    const store = app.get(JobStore);
+    elastic.get.mockResolvedValue({
+      body: { _source: job, _seq_no: 4, _primary_term: 1 },
+    });
+    const stored = await store.get(job.job_id);
+    expect(stored.concurrencyToken).toBe('[4,1]');
+    elastic.create.mockResolvedValue({
+      body: { _seq_no: 0, _primary_term: 1 },
+    });
+    const created = await store.create(stored.source);
+    expect(created.concurrencyToken).toBe('[0,1]');
+    elastic.index.mockResolvedValue({
+      body: { _seq_no: 29, _primary_term: 3 },
+    });
+    const result = await store.replace(stored.source, stored.concurrencyToken);
+    expect(result).toEqual({
+      source: stored.source,
+      concurrencyToken: '[29,3]',
+    });
+  });
+
+  it('fails explicitly when storage omits committed concurrency metadata', async () => {
     elastic.index.mockResolvedValue({ body: {} });
     await request(app.getHttpServer())
       .patch(`${base}/j-1`)
@@ -302,6 +330,20 @@ describe('Domain jobs API and legacy compatibility', () => {
         .set('If-Match', etag)
         .send(method === 'patch' ? { status: 'running' } : undefined)
         .expect(412);
+      expect(elastic.index).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(['patch', 'delete'] as const)(
+    'returns 409 on an unconditional %s conflict without retrying',
+    async (method) => {
+      elastic.index.mockRejectedValue(esError(409));
+      const response = await request(app.getHttpServer())
+        [method](`${base}/j-1`)
+        .send(method === 'patch' ? { status: 'running' } : undefined)
+        .expect(409);
+      expect(response.body.message).toBe('Job changed; retry the request');
+      expect(elastic.get).toHaveBeenCalledTimes(1);
       expect(elastic.index).toHaveBeenCalledTimes(1);
     },
   );
@@ -423,7 +465,7 @@ describe('Domain jobs API and legacy compatibility', () => {
     );
   });
 
-  it('returns structured continuations and rejects changed listings or backends', async () => {
+  it('returns structured continuations and allows changed listing parameters', async () => {
     const second = {
       ...hit,
       _source: { ...job, job_id: 'j-2' },
@@ -437,7 +479,6 @@ describe('Domain jobs API and legacy compatibility', () => {
     expect(first.body.jobs).toEqual([job]);
     expect(first.body.next_page).toEqual({
       as_of: expect.any(String),
-      fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
       position: { created: hit.sort[0], job_id: hit.sort[1] },
     });
     elastic.search.mockResolvedValueOnce(result([second]));
@@ -446,6 +487,7 @@ describe('Domain jobs API and legacy compatibility', () => {
       .send({ user_id: 'alice', limit: 1, next_page: first.body.next_page })
       .expect(200, { jobs: [second._source], next_page: null });
     expect(elastic.search.mock.calls[1][0].body.search_after).toEqual(hit.sort);
+    elastic.search.mockResolvedValue(result([]));
     for (const [url, query] of [
       [`${base}/user`, { user_id: 'alice', limit: 2 }],
       [`${base}/user`, { user_id: 'alice', limit: 1, backend_id: 'prod' }],
@@ -455,9 +497,12 @@ describe('Domain jobs API and legacy compatibility', () => {
       await request(app.getHttpServer())
         .post(url)
         .send({ ...query, next_page: first.body.next_page })
-        .expect(400);
+        .expect(200, { jobs: [], next_page: null });
     }
-    expect(elastic.search).toHaveBeenCalledTimes(2);
+    expect(elastic.search).toHaveBeenCalledTimes(6);
+    for (const [search] of elastic.search.mock.calls.slice(2)) {
+      expect(search.body.search_after).toEqual(hit.sort);
+    }
   });
 
   it.each([
@@ -483,42 +528,36 @@ describe('Domain jobs API and legacy compatibility', () => {
     {
       next_page: {
         as_of: 'not-a-date',
-        fingerprint: '0'.repeat(64),
         position: { created: 1, job_id: 'j-1' },
       },
     },
     {
       next_page: {
         as_of: '2026-02-30T00:00:00Z',
-        fingerprint: '0'.repeat(64),
         position: { created: 1, job_id: 'j-1' },
       },
     },
     {
       next_page: {
         as_of: '2026-11-10T00:00:00Z',
-        fingerprint: '0'.repeat(64),
         position: { created: '1', job_id: 'j-1' },
       },
     },
     {
       next_page: {
         as_of: '2026-11-10T00:00:00Z',
-        fingerprint: '0'.repeat(64),
         position: { job_id: 'j-1' },
       },
     },
     {
       next_page: {
         as_of: '2026-11-10T00:00:00Z',
-        fingerprint: '0'.repeat(64),
         position: { created: 1, job_id: 1 },
       },
     },
     {
       next_page: {
         as_of: '2026-11-10T00:00:00Z',
-        fingerprint: '0'.repeat(64),
         position: null,
       },
     },
@@ -651,6 +690,7 @@ describe('Domain jobs API and legacy compatibility', () => {
 
   it.each([
     {},
+    { created: '2026-11-10T12:00:00Z' },
     { backend_id: 'prod' },
     { job_id: 'replacement' },
     { user_id: 'bob' },
@@ -665,7 +705,7 @@ describe('Domain jobs API and legacy compatibility', () => {
     expect(elastic.update).not.toHaveBeenCalled();
   });
 
-  it('rejects invalid creation identities and query-scope overrides', async () => {
+  it('rejects invalid creation identities', async () => {
     for (const body of [
       { job_id: 'j-1', user_id: 'alice', backend_id: '' },
       { job_id: 'j-1', user_id: 'alice', backend_id: null },
@@ -682,9 +722,6 @@ describe('Domain jobs API and legacy compatibility', () => {
     await request(app.getHttpServer())
       .post(base)
       .send({ job_id: 'j-1', user_id: 'alice' })
-      .expect(400);
-    await request(app.getHttpServer())
-      .get(`${base}/j-1?backend_id=prod`)
       .expect(400);
     expect(elastic.search).not.toHaveBeenCalled();
   });
@@ -903,13 +940,14 @@ describe('Domain jobs API and legacy compatibility', () => {
   });
 
   it.each(['patch', 'delete'] as const)(
-    'requires a valid client version for %s',
+    'allows %s without If-Match by default and rejects malformed supplied values',
     async (method) => {
       const body = method === 'patch' ? { status: 'running' } : undefined;
       await request(app.getHttpServer())
         [method](`${base}/j-1`)
         .send(body)
-        .expect(428);
+        .expect(method === 'patch' ? 200 : 204);
+      expect(elastic.index).toHaveBeenCalledTimes(1);
       for (const token of ['*', `W/${etag}`, `${etag}, ${etag}`, 'invalid']) {
         await request(app.getHttpServer())
           [method](`${base}/j-1`)
@@ -922,7 +960,7 @@ describe('Domain jobs API and legacy compatibility', () => {
         .set('If-Match', `"${'0'.repeat(64)}"`)
         .send(body)
         .expect(412);
-      expect(elastic.index).not.toHaveBeenCalled();
+      expect(elastic.index).toHaveBeenCalledTimes(1);
     },
   );
 
@@ -1013,6 +1051,7 @@ describe('Domain jobs API and legacy compatibility', () => {
         .expect(201);
       expect(replay.body).toEqual(first.body);
       expect(replay.headers.etag).toBe(first.headers.etag);
+      expect(replay.headers.location).toBe('/v2/jobs/1');
       const current = await request(app.getHttpServer())
         .get(`${base}/1`)
         .expect(200);
@@ -1033,9 +1072,10 @@ describe('Domain jobs API and legacy compatibility', () => {
       expect(replay.body).toEqual(changed.body);
       expect(replay.body.created).toBe(first.body.created);
       expect(replay.headers.etag).toBe(changed.headers.etag);
+      expect(replay.headers.location).toBe('/v2/jobs/j-1');
       expect(elastic.index).toHaveBeenCalledTimes(1);
       expect(elastic.index.mock.calls[0][0].body._registry).toEqual({
-        revision: expect.any(String),
+        etag: expect.any(String),
         creationFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
       });
       expect(
@@ -1095,8 +1135,8 @@ describe('Domain jobs API and legacy compatibility', () => {
           .delete(`${base}/j-1`)
           .set('If-Match', next.headers.etag);
       await remove().expect(204);
-      await remove().expect(412);
-      await patch().expect(412);
+      await remove().expect(204);
+      await patch().expect(404);
       await request(app.getHttpServer()).get(`${base}/j-1`).expect(404);
       await create().expect(409);
       await request(app.getHttpServer()).get(`${base}/j-1`).expect(404);
@@ -1127,7 +1167,7 @@ describe('Domain jobs API and legacy compatibility', () => {
       expect(replay.headers.etag).toBe(first.headers.etag);
       expect(elastic.index).not.toHaveBeenCalled();
       expect(elastic.create.mock.calls[0][0].body._registry).toEqual({
-        revision: expect.any(String),
+        etag: expect.any(String),
         creationFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
       });
     });

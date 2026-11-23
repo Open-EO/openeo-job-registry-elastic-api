@@ -1,51 +1,35 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
-import * as request from 'supertest';
+import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
+import request = require('supertest');
 import { randomUUID } from 'crypto';
-import { JobsModule } from '../src/jobs/jobs.module';
 import { ConfigService } from '../src/config/config/config.service';
-import { mappings } from '../src/jobs/services/database/config/index_create.json';
 import { JobContinuation } from '../src/jobs/models/job.v2.dto';
+import { JobsModule } from '../src/jobs/jobs.module';
 
-const host = process.env.EJR_TEST_ES_URL;
-const integration = host ? describe : describe.skip;
-
-integration('Domain API against a disposable local Elasticsearch', () => {
+describe('Jobs v2 API', () => {
   let app: INestApplication;
-  let elastic: ElasticsearchService;
-  let createdIndex = false;
-  const index = `ejr-domain-test-${randomUUID()}`;
+  let esService: ElasticsearchService;
+  let configService: ConfigService;
+  let index: string;
   const base = '/v2/jobs';
   const timestamp = '2026-11-09T12:00:00Z';
+  const runId = randomUUID();
+  const createdJobIds = new Set<string>();
+
+  const jobId = (name: string) => {
+    const id = `j-v2-${runId}-${name}`;
+    createdJobIds.add(id);
+    return id;
+  };
 
   beforeAll(async () => {
-    const url = new URL(host);
-    if (
-      url.protocol !== 'http:' ||
-      !['localhost', '127.0.0.1'].includes(url.hostname) ||
-      url.username ||
-      url.password ||
-      url.pathname !== '/' ||
-      url.search ||
-      url.hash
-    ) {
-      throw new Error(
-        'EJR_TEST_ES_URL must be an unauthenticated local disposable HTTP server',
-      );
-    }
-    const config = new ConfigService();
-    const module = await Test.createTestingModule({ imports: [JobsModule] })
-      .overrideProvider(ConfigService)
-      .useValue({
-        get: (name: string) => {
-          if (name === 'database.jobsIdx') return index;
-          if (name === 'database.hosts') return host;
-          return config.get(name);
-        },
-      })
-      .compile();
-    app = module.createNestApplication();
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [JobsModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
     app.useLogger(false);
     app.useGlobalPipes(
       new ValidationPipe({
@@ -55,31 +39,31 @@ integration('Domain API against a disposable local Elasticsearch', () => {
         forbidNonWhitelisted: true,
       }),
     );
-    elastic = module.get(ElasticsearchService);
-    await elastic.indices.create({
-      index,
-      body: {
-        mappings,
-        settings: { number_of_shards: 1, number_of_replicas: 0 },
-      },
-    });
-    createdIndex = true;
+    esService = moduleFixture.get<ElasticsearchService>(ElasticsearchService);
+    configService = moduleFixture.get<ConfigService>(ConfigService);
+    index = configService.get('database.jobsIdx');
     await app.init();
   });
 
   afterAll(async () => {
     try {
-      if (createdIndex) await elastic.indices.delete({ index });
+      if (createdJobIds.size > 0) {
+        await esService.deleteByQuery({
+          index,
+          refresh: true,
+          body: { query: { terms: { job_id: [...createdJobIds] } } },
+        });
+      }
     } finally {
       if (app) await app.close();
-      if (elastic) await elastic.close();
     }
   });
 
-  it('uses direct IDs, returns current jobs on repeated create, and rejects stale mutations', async () => {
-    const search = jest.spyOn(elastic, 'search');
+  it('uses direct IDs, returns current jobs on repeated create, and rejects stale ETags', async () => {
+    const search = jest.spyOn(esService, 'search');
+    const directJobId = jobId('direct');
     const input = {
-      job_id: 'j-direct',
+      job_id: directJobId,
       user_id: 'alice',
       parent_id: 'parent-a',
       created: timestamp,
@@ -90,27 +74,17 @@ integration('Domain API against a disposable local Elasticsearch', () => {
         .post(base)
         .send({ backend_id: 'qa', ...input });
     const first = await create().expect(201);
-    const stored = await elastic.get({ index, id: input.job_id });
+    expect(first.headers.location).toBe(`/v2/jobs/${input.job_id}`);
+    const stored = await esService.get({ index, id: input.job_id });
     expect(stored.body._source.job_id).toBe(input.job_id);
     const read = await request(app.getHttpServer())
       .get(`${base}/${input.job_id}`)
       .expect(200);
     expect(read.headers.etag).toBe(first.headers.etag);
     await request(app.getHttpServer())
-      .get(`${base}/${input.job_id}?user_id=bob`)
-      .expect(404);
-    await request(app.getHttpServer())
-      .get(`/backends/qa/jobs/${input.job_id}`)
-      .expect(404);
-    await request(app.getHttpServer())
       .post(base)
       .send({ ...input, backend_id: 'prod' })
       .expect(409);
-    await request(app.getHttpServer())
-      .patch(`${base}/${input.job_id}`)
-      .send({ status: 'running' })
-      .expect(428);
-
     const patch = () =>
       request(app.getHttpServer())
         .patch(`${base}/${input.job_id}`)
@@ -146,10 +120,10 @@ integration('Domain API against a disposable local Elasticsearch', () => {
       .post(base)
       .send({ backend_id: 'qa', ...input, parent_id: 'parent-b' })
       .expect(409);
-    const unchanged = await elastic.get({ index, id: input.job_id });
+    const unchanged = await esService.get({ index, id: input.job_id });
     expect(unchanged.body._version).toBe(3);
     expect(unchanged.body._source._registry).toEqual({
-      revision: expect.any(String),
+      etag: expect.any(String),
       creationFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
     const current = await request(app.getHttpServer())
@@ -161,7 +135,7 @@ integration('Domain API against a disposable local Elasticsearch', () => {
         .delete(`${base}/${input.job_id}`)
         .set('If-Match', finished.headers.etag);
     await remove().expect(204);
-    await remove().expect(412);
+    await remove().expect(204);
     await request(app.getHttpServer())
       .get(`${base}/${input.job_id}`)
       .expect(404);
@@ -178,15 +152,41 @@ integration('Domain API against a disposable local Elasticsearch', () => {
     expect(listing.body).toEqual({ jobs: [], next_page: null });
   }, 30000);
 
+  it('supports stateless status updates without enforcing transition order', async () => {
+    const statelessJobId = jobId('stateless-driver');
+    await request(app.getHttpServer())
+      .post(base)
+      .send({ backend_id: 'qa', job_id: statelessJobId, user_id: 'alice' })
+      .expect(201);
+    for (const status of ['queued', 'running', 'finished']) {
+      await request(app.getHttpServer())
+        .patch(`${base}/${statelessJobId}`)
+        .send({ status })
+        .expect(200)
+        .expect((response) => {
+          expect(response.headers.etag).toMatch(/^"[A-Za-z0-9_-]+"$/);
+        });
+    }
+    await request(app.getHttpServer())
+      .patch(`${base}/${statelessJobId}`)
+      .send({ status: 'running' })
+      .expect(200);
+    await request(app.getHttpServer())
+      .get(`${base}/${statelessJobId}`)
+      .expect(200)
+      .expect(({ body }) => expect(body.status).toBe('running'));
+  }, 30000);
+
   it('atomically accepts only one writer even for identical concurrent requests', async () => {
+    const raceJobId = jobId('race');
     const initial = await request(app.getHttpServer())
       .post(base)
-      .send({ backend_id: 'qa', job_id: 'j-race', user_id: 'alice' })
+      .send({ backend_id: 'qa', job_id: raceJobId, user_id: 'alice' })
       .expect(201);
     const responses = await Promise.all(
       ['running', 'queued'].map((status) =>
         request(app.getHttpServer())
-          .patch(`${base}/j-race`)
+          .patch(`${base}/${raceJobId}`)
           .set('If-Match', initial.headers.etag)
           .send({ status }),
       ),
@@ -195,12 +195,12 @@ integration('Domain API against a disposable local Elasticsearch', () => {
       200, 412,
     ]);
     const current = await request(app.getHttpServer())
-      .get(`${base}/j-race`)
+      .get(`${base}/${raceJobId}`)
       .expect(200);
     const identical = await Promise.all(
       [1, 2].map(() =>
         request(app.getHttpServer())
-          .patch(`${base}/j-race`)
+          .patch(`${base}/${raceJobId}`)
           .set('If-Match', current.headers.etag)
           .send({ status: 'finished' }),
       ),
@@ -210,67 +210,52 @@ integration('Domain API against a disposable local Elasticsearch', () => {
     ]);
   }, 30000);
 
-  it('requires explicit migration for random-ID records and detects intervening legacy writes', async () => {
-    const legacy = {
-      backend_id: 'legacy',
-      job_id: 'j-random',
-      user_id: 'alice',
-    };
-    await request(app.getHttpServer()).post('/jobs').send(legacy).expect(201);
-    await elastic.indices.refresh({ index });
-    await request(app.getHttpServer()).get(`${base}/j-random`).expect(404);
+  it('changes the stored ETag on each v2 update, even when a value is restored', async () => {
+    const updatedJobId = jobId('etag-update');
     const first = await request(app.getHttpServer())
       .post(base)
-      .send({ backend_id: 'qa', job_id: 'j-legacy-write', user_id: 'alice' })
+      .send({ backend_id: 'qa', job_id: updatedJobId, user_id: 'alice' })
       .expect(201);
-    await request(app.getHttpServer())
-      .patch('/jobs/j-legacy-write')
+    const changed = await request(app.getHttpServer())
+      .patch(`${base}/${updatedJobId}`)
+      .set('If-Match', first.headers.etag)
       .send({ status: 'running' })
       .expect(200);
-    await request(app.getHttpServer())
-      .patch(`${base}/j-legacy-write`)
-      .set('If-Match', first.headers.etag)
-      .send({ status: 'error' })
-      .expect(412);
-    await elastic.indices.refresh({ index });
-    const listing = await request(app.getHttpServer())
-      .post(`${base}/active`)
-      .send({ backend_id: 'qa' })
-      .expect(200);
-    const listed = listing.body.jobs.find(
-      (job) => job.job_id === 'j-legacy-write',
-    );
-    expect(listed._registry).toBeUndefined();
-    expect(listed.status).toBe('running');
-    await request(app.getHttpServer())
-      .patch('/jobs/j-legacy-write')
+    const restored = await request(app.getHttpServer())
+      .patch(`${base}/${updatedJobId}`)
+      .set('If-Match', changed.headers.etag)
       .send({ status: 'created' })
       .expect(200);
-    const restored = await request(app.getHttpServer())
-      .get(`${base}/j-legacy-write`)
-      .expect(200);
-    expect(restored.body).toEqual(first.body);
+    expect(restored.body.status).toBe(first.body.status);
     expect(restored.headers.etag).not.toBe(first.headers.etag);
+    expect(restored.headers.etag).not.toBe(changed.headers.etag);
+    const stored = await esService.get({ index, id: updatedJobId });
+    expect(restored.headers.etag).toBe(
+      `"${stored.body._source._registry.etag}"`,
+    );
     await request(app.getHttpServer())
-      .patch(`${base}/j-legacy-write`)
+      .patch(`${base}/${updatedJobId}`)
       .set('If-Match', first.headers.etag)
       .send({ status: 'error' })
       .expect(412);
   }, 30000);
 
   it('traverses more than 1000 records with equal timestamps without truncation', async () => {
-    await elastic.bulk({
+    const manyJobs = Array.from({ length: 1001 }, (_, i) =>
+      jobId(`many-${String(i).padStart(4, '0')}`),
+    );
+    await esService.bulk({
       refresh: 'wait_for',
-      body: Array.from({ length: 1001 }, (_, i) => [
-        { index: { _index: index, _id: `j-many-${i}` } },
+      body: manyJobs.flatMap((id) => [
+        { index: { _index: index, _id: id } },
         {
           backend_id: 'many',
-          job_id: `j-${String(i).padStart(4, '0')}`,
+          job_id: id,
           user_id: 'alice',
           created: timestamp,
           status: 'running',
         },
-      ]).flat(),
+      ]),
     });
     const body = {
       backend_id: 'many',
@@ -282,13 +267,13 @@ integration('Domain API against a disposable local Elasticsearch', () => {
       .send(body)
       .expect(200);
     expect(first.body.jobs).toHaveLength(1000);
-    expect(first.body.jobs[0]).toEqual({ job_id: 'j-0000' });
-    expect(first.body.jobs[999]).toEqual({ job_id: 'j-0999' });
+    expect(first.body.jobs[0]).toEqual({ job_id: manyJobs[0] });
+    expect(first.body.jobs[999]).toEqual({ job_id: manyJobs[999] });
     await request(app.getHttpServer())
       .post(`${base}/active`)
       .send({ ...body, next_page: first.body.next_page })
       .expect(200, {
-        jobs: [{ job_id: 'j-1000' }],
+        jobs: [{ job_id: manyJobs[1000] }],
         next_page: null,
       });
   }, 30000);
@@ -298,7 +283,7 @@ integration('Domain API against a disposable local Elasticsearch', () => {
       await request(app.getHttpServer())
         .post(base)
         .send({
-          job_id: `j-scope-${backend_id}`,
+          job_id: jobId(`scope-${backend_id}`),
           backend_id,
           user_id: 'scope-user',
         })
@@ -317,8 +302,10 @@ integration('Domain API against a disposable local Elasticsearch', () => {
       .send({ user_id: 'scope-user', backend_id: 'CDSE' })
       .expect(200);
     expect(scoped.body.jobs).toHaveLength(1);
-    expect(scoped.body.jobs[0].job_id).toBe('j-scope-CDSE');
-    await request(app.getHttpServer()).get(`${base}/j-scope-OTC`).expect(200);
+    expect(scoped.body.jobs[0].job_id).toBe(jobId('scope-CDSE'));
+    await request(app.getHttpServer())
+      .get(`${base}/${jobId('scope-OTC')}`)
+      .expect(200);
   }, 30000);
 
   it('applies dedicated listing semantics, projects user jobs and excludes tombstones', async () => {
@@ -331,11 +318,12 @@ integration('Domain API against a disposable local Elasticsearch', () => {
       'canceled',
     ];
     const updated = '2026-11-09T12:00:00Z';
-    await elastic.bulk({
+    const deletedJobId = jobId('list-deleted');
+    await esService.bulk({
       refresh: 'wait_for',
       body: [
         ...statuses.map((status) => ({
-          job_id: `j-list-${status}`,
+          job_id: jobId(`list-${status}`),
           backend_id: 'listing',
           user_id: 'listing-user',
           created: updated,
@@ -347,7 +335,7 @@ integration('Domain API against a disposable local Elasticsearch', () => {
           process: { process_graph: {} },
         })),
         {
-          job_id: 'j-list-deleted',
+          job_id: deletedJobId,
           backend_id: 'listing',
           user_id: 'listing-user',
           created: updated,
@@ -423,17 +411,21 @@ integration('Domain API against a disposable local Elasticsearch', () => {
     const now = Date.now();
     const daysAgo = (days: number) =>
       new Date(now - days * 86400000).toISOString();
-    await elastic.bulk({
+    await esService.bulk({
       refresh: 'wait_for',
       body: [
-        { job_id: 'j-age-recent', created: daysAgo(1), updated: daysAgo(0.5) },
         {
-          job_id: 'j-age-old-created',
+          job_id: jobId('age-recent'),
+          created: daysAgo(1),
+          updated: daysAgo(0.5),
+        },
+        {
+          job_id: jobId('age-old-created'),
           created: daysAgo(40),
           updated: daysAgo(0.5),
         },
         {
-          job_id: 'j-age-old-updated',
+          job_id: jobId('age-old-updated'),
           created: daysAgo(10),
           updated: daysAgo(8),
         },
@@ -446,15 +438,20 @@ integration('Domain API against a disposable local Elasticsearch', () => {
       .post(`${base}/active`)
       .send({ backend_id: 'age-list', max_age: 30, max_updated_ago: 7 })
       .expect(200);
-    expect(page.body.jobs.map((job) => job.job_id)).toEqual(['j-age-recent']);
+    expect(page.body.jobs.map((job) => job.job_id)).toEqual([
+      jobId('age-recent'),
+    ]);
   }, 30000);
 
   it('converges identical concurrent creates and rejects different input', async () => {
+    const concurrentJobId = jobId('concurrent');
     const responses = await Promise.all(
       [1, 2].map(() =>
-        request(app.getHttpServer())
-          .post(base)
-          .send({ backend_id: 'qa', job_id: 'j-concurrent', user_id: 'alice' }),
+        request(app.getHttpServer()).post(base).send({
+          backend_id: 'qa',
+          job_id: concurrentJobId,
+          user_id: 'alice',
+        }),
       ),
     );
     expect(responses.map((response) => response.status)).toEqual([201, 201]);
@@ -462,18 +459,19 @@ integration('Domain API against a disposable local Elasticsearch', () => {
     expect(responses[0].headers.etag).toBe(responses[1].headers.etag);
     await request(app.getHttpServer())
       .post(base)
-      .send({ backend_id: 'qa', job_id: 'j-concurrent', user_id: 'bob' })
+      .send({ backend_id: 'qa', job_id: concurrentJobId, user_id: 'bob' })
       .expect(409);
-    const stored = await elastic.get({ index, id: 'j-concurrent' });
+    const stored = await esService.get({ index, id: concurrentJobId });
     expect(stored.body._version).toBe(1);
   }, 30000);
 
   it('accepts only one of two concurrent creates with different bodies', async () => {
+    const differentInputJobId = jobId('different-input-race');
     const responses = await Promise.all(
       ['parent-a', 'parent-b'].map((parent_id) =>
         request(app.getHttpServer()).post(base).send({
           backend_id: 'qa',
-          job_id: 'j-create-race',
+          job_id: differentInputJobId,
           user_id: 'alice',
           parent_id,
         }),
@@ -484,11 +482,11 @@ integration('Domain API against a disposable local Elasticsearch', () => {
     ]);
     const winner = responses.find((response) => response.status === 201);
     const current = await request(app.getHttpServer())
-      .get(`${base}/j-create-race`)
+      .get(`${base}/${differentInputJobId}`)
       .expect(200);
     expect(current.body).toEqual(winner.body);
     expect(current.headers.etag).toBe(winner.headers.etag);
-    const stored = await elastic.get({ index, id: 'j-create-race' });
+    const stored = await esService.get({ index, id: differentInputJobId });
     expect(stored.body._version).toBe(1);
   }, 30000);
 });

@@ -8,7 +8,6 @@ import {
   Param,
   Patch,
   Post,
-  Query,
   Res,
 } from '@nestjs/common';
 import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -19,7 +18,6 @@ import {
   ListUserJobs,
   ListActiveJobs,
   ListCleanupCandidates,
-  JobScope,
   UpdateJob,
 } from '../../models/job.v2.dto';
 
@@ -36,6 +34,10 @@ export class JobsController {
   ) {
     const result = await this.registry.create(job);
     response.setHeader('ETag', result.etag);
+    response.setHeader(
+      'Location',
+      `/v2/jobs/${encodeURIComponent(result.job.job_id)}`,
+    );
     return result.job;
   }
 
@@ -65,49 +67,43 @@ export class JobsController {
   @Get(':jobId')
   async get(
     @Param('jobId') jobId: string,
-    @Query() scope: JobScope,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const result = await this.registry.get({
-      job_id: jobId,
-      ...scope,
-    });
+    const result = await this.registry.get(jobId);
     response.setHeader('ETag', result.etag);
     return result.job;
   }
 
   @Patch(':jobId')
-  @ApiHeader({ name: 'If-Match', required: true })
+  @ApiHeader({
+    name: 'If-Match',
+    required: false,
+    description:
+      'Optional strong ETag. When supplied, enables strict concurrency checking; conflicts without it return 409.',
+  })
   async patch(
     @Param('jobId') jobId: string,
-    @Query() scope: JobScope,
     @Body() update: UpdateJob,
     @Headers('if-match') ifMatch: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const result = await this.registry.patch(
-      { job_id: jobId, ...scope },
-      update,
-      { ifMatch },
-    );
+    const result = await this.registry.patch(jobId, update, ifMatch);
     response.setHeader('ETag', result.etag);
     return result.job;
   }
 
   @Delete(':jobId')
   @HttpCode(204)
-  @ApiHeader({ name: 'If-Match', required: true })
+  @ApiHeader({
+    name: 'If-Match',
+    required: false,
+    description:
+      'Optional strong ETag. When supplied, enables strict concurrency checking; conflicts without it return 409.',
+  })
   async delete(
     @Param('jobId') jobId: string,
-    @Query() scope: JobScope,
     @Headers('if-match') ifMatch: string | undefined,
   ): Promise<void> {
-    await this.registry.delete(
-      {
-        job_id: jobId,
-        ...scope,
-      },
-      { ifMatch },
-    );
+    await this.registry.delete(jobId, ifMatch);
   }
 }

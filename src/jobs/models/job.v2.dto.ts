@@ -126,11 +126,6 @@ export class JobMetadata {
   @ApiPropertyOptional({ format: 'date-time', nullable: true })
   @IsOptional()
   @IsDateString()
-  created?: string | null;
-
-  @ApiPropertyOptional({ format: 'date-time', nullable: true })
-  @IsOptional()
-  @IsDateString()
   updated?: string | null;
 
   @ApiPropertyOptional({ format: 'date-time', nullable: true })
@@ -262,6 +257,11 @@ export class Job extends JobMetadata {
   @IsNotEmpty()
   user_id: string;
 
+  @ApiPropertyOptional({ format: 'date-time', nullable: true })
+  @IsOptional()
+  @IsDateString()
+  created?: string | null;
+
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsString()
@@ -326,14 +326,6 @@ export const JOB_FIELDS: (keyof Job)[] = [
   'cpu_time_seconds',
   'memory_time_megabyte_seconds',
 ];
-
-export class JobScope {
-  @ApiPropertyOptional()
-  @ValidateIf((_, value) => value !== undefined)
-  @IsString()
-  @IsNotEmpty()
-  user_id?: string;
-}
 
 export class CreateJob extends Job {}
 
@@ -460,13 +452,6 @@ export class JobContinuation {
   @IsISO8601({ strict: true })
   @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/)
   as_of: string;
-
-  @ApiProperty({
-    description: 'Hash binding this continuation to its listing parameters',
-  })
-  @IsString()
-  @Matches(/^[a-f0-9]{64}$/)
-  fingerprint: string;
 
   @ApiProperty({ type: JobPosition })
   @IsObject()

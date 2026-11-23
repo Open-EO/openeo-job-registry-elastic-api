@@ -1,8 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
-  HttpException,
   Injectable,
+  Logger,
   NotFoundException,
   PreconditionFailedException,
   ServiceUnavailableException,
@@ -10,16 +10,15 @@ import {
 import { createHash, randomUUID } from 'crypto';
 import {
   CreateJob,
-  JobMetadata,
   SearchJobs,
   JOB_FIELDS,
   ListJobs,
   ListUserJobs,
   ListActiveJobs,
   ListCleanupCandidates,
+  UpdateJob,
 } from '../models/job.v2.dto';
 import {
-  JobKey,
   JobPage,
   JobSource,
   JobStore,
@@ -27,7 +26,6 @@ import {
   JobStoreInvalidInputError,
   JobStoreNotFoundError,
   JobStoreUnavailableError,
-  MutationOptions,
   StoredJob,
   VersionedJob,
 } from '../stores/job-store';
@@ -59,20 +57,29 @@ function publicJob<T extends Partial<JobSource>>(source: T): T {
 
 function versioned(record: StoredJob): VersionedJob {
   const job = publicJob(record.source);
+  const etag = record.source._registry?.etag || '';
   return {
     job,
-    etag: `"${hash({
-      job,
-      revision: record.source._registry?.revision,
-      deleted: record.source.deleted === true,
-      documentVersion: record.version,
-    })}"`,
+    etag: `"${etag}"`,
   };
+}
+
+function patchAlreadyApplied(current: JobSource, update: UpdateJob): boolean {
+  return Object.keys(update).every(
+    (field) =>
+      canonical(current[field]) === canonical(update[field as keyof UpdateJob]),
+  );
 }
 
 @Injectable()
 export class JobRegistryService {
+  private readonly logger = new Logger(JobRegistryService.name);
+
   constructor(private readonly store: JobStore) {}
+
+  private debug(event: string, details: Record<string, unknown> = {}): void {
+    this.logger.debug(JSON.stringify({ event, ...details }));
+  }
 
   private async execute<T>(operation: () => Promise<T>): Promise<T> {
     try {
@@ -91,12 +98,9 @@ export class JobRegistryService {
     }
   }
 
-  private async find(key: JobKey): Promise<StoredJob> {
-    const record = await this.store.get(key.job_id);
-    if (
-      record.source.job_id !== key.job_id ||
-      (key.user_id !== undefined && record.source.user_id !== key.user_id)
-    ) {
+  private async find(jobId: string): Promise<StoredJob> {
+    const record = await this.store.get(jobId);
+    if (record.source.job_id !== jobId) {
       throw new NotFoundException('Job not found');
     }
     return record;
@@ -104,6 +108,10 @@ export class JobRegistryService {
 
   create(input: CreateJob): Promise<VersionedJob> {
     return this.execute(async () => {
+      this.debug('job_create_attempt', {
+        job_id: input.job_id,
+        backend_id: input.backend_id,
+      });
       const creationFingerprint = hash(input);
       const now = new Date().toISOString();
       const source: JobSource = {
@@ -111,31 +119,51 @@ export class JobRegistryService {
         status: input.status || 'created',
         created: input.created || now,
         updated: input.updated || now,
-        _registry: { revision: randomUUID(), creationFingerprint },
+        _registry: { etag: randomUUID(), creationFingerprint },
       };
       try {
-        return versioned(await this.store.create(source));
+        const created = await this.store.create(source);
+        this.debug('job_create_succeeded', { job_id: input.job_id });
+        return versioned(created);
       } catch (error: unknown) {
         if (!(error instanceof JobStoreConflictError)) throw error;
+        this.debug('job_create_conflict', { job_id: input.job_id });
         let found: StoredJob;
         try {
-          found = await this.find({ job_id: input.job_id });
+          found = await this.find(input.job_id);
         } catch (lookupError: unknown) {
           if (
             lookupError instanceof JobStoreNotFoundError ||
             lookupError instanceof NotFoundException
           ) {
-            throw new ConflictException('Job ID is already reserved');
+            this.debug('job_create_conflict_unresolved', {
+              job_id: input.job_id,
+            });
+            throw new ConflictException(
+              'Job creation conflicted, but no existing job could be found to reconcile the request',
+            );
           }
           throw lookupError;
         }
         if (found.source.backend_id !== input.backend_id) {
+          this.debug('job_create_rejected', {
+            job_id: input.job_id,
+            reason: 'backend_mismatch',
+          });
           throw new ConflictException('Job ID is already reserved');
         }
         if (found.source.deleted) {
+          this.debug('job_create_rejected', {
+            job_id: input.job_id,
+            reason: 'deleted_job',
+          });
           throw new ConflictException('Job ID belongs to a deleted job');
         }
         if (!found.source._registry?.creationFingerprint) {
+          this.debug('job_create_rejected', {
+            job_id: input.job_id,
+            reason: 'missing_creation_fingerprint',
+          });
           throw new ConflictException(
             'Original creation input is unavailable for this job',
           );
@@ -143,85 +171,135 @@ export class JobRegistryService {
         if (
           found.source._registry.creationFingerprint !== creationFingerprint
         ) {
+          this.debug('job_create_rejected', {
+            job_id: input.job_id,
+            reason: 'creation_fingerprint_mismatch',
+          });
           throw new ConflictException(
             'Job ID was created with different input',
           );
         }
+        this.debug('job_create_replayed', { job_id: input.job_id });
         return versioned(found);
       }
     });
   }
 
-  get(key: JobKey): Promise<VersionedJob> {
+  get(jobId: string): Promise<VersionedJob> {
     return this.execute(async () => {
-      const record = await this.find(key);
+      this.debug('job_read', { job_id: jobId });
+      const record = await this.find(jobId);
       if (record.source.deleted) throw new NotFoundException('Job not found');
       return versioned(record);
     });
   }
 
   patch(
-    key: JobKey,
-    update: JobMetadata,
-    options: MutationOptions,
+    jobId: string,
+    update: UpdateJob,
+    ifMatch?: string,
   ): Promise<VersionedJob> {
-    return this.execute(() => this.mutate('patch', key, update, options));
+    return this.execute(() => this.mutate('patch', jobId, update, ifMatch));
   }
 
-  delete(key: JobKey, options: MutationOptions): Promise<void> {
+  delete(jobId: string, ifMatch?: string): Promise<void> {
     return this.execute(async () => {
-      await this.mutate('delete', key, {}, options);
+      await this.mutate('delete', jobId, {}, ifMatch);
     });
   }
 
   private async mutate(
     method: 'patch' | 'delete',
-    key: JobKey,
-    update: JobMetadata,
-    options: MutationOptions,
+    jobId: string,
+    update: UpdateJob,
+    ifMatch?: string,
   ): Promise<VersionedJob> {
     if (method === 'patch' && Object.keys(update).length === 0) {
       throw new BadRequestException(
         'An update must contain at least one field',
       );
     }
-    if (!options.ifMatch) {
-      throw new HttpException('If-Match is required; read the job first', 428);
+    const hasIfMatch = ifMatch !== undefined;
+    this.debug('job_mutation_selected', {
+      operation: method,
+      job_id: jobId,
+      mode: hasIfMatch ? 'strict' : 'unconditional',
+    });
+    const found = await this.find(jobId);
+    if (method === 'delete' && found.source.deleted) return versioned(found);
+    if (found.source.deleted) throw new NotFoundException('Job not found');
+    const etagMismatch = hasIfMatch && versioned(found).etag !== ifMatch;
+    if (
+      method === 'patch' &&
+      (!hasIfMatch || etagMismatch) &&
+      patchAlreadyApplied(found.source, update)
+    ) {
+      this.debug('job_mutation_already_applied', {
+        operation: method,
+        job_id: jobId,
+        mode: hasIfMatch ? 'strict' : 'unconditional',
+      });
+      return versioned(found);
     }
-    if (!/^"[a-f0-9]{64}"$/.test(options.ifMatch)) {
-      throw new BadRequestException(
-        'If-Match must contain one strong job ETag',
-      );
-    }
-    const found = await this.find(key);
-    if (versioned(found).etag !== options.ifMatch) {
+    if (etagMismatch) {
+      this.debug('job_mutation_precondition_failed', {
+        operation: method,
+        job_id: jobId,
+      });
       throw new PreconditionFailedException('Job changed; read it again');
     }
-    if (found.source.deleted) throw new NotFoundException('Job not found');
+    try {
+      return await this.replace(method, jobId, update, found, hasIfMatch);
+    } catch (error: unknown) {
+      if (!(error instanceof JobStoreConflictError)) throw error;
+      this.debug('job_mutation_conflict', {
+        operation: method,
+        job_id: jobId,
+      });
+      throw new ConflictException('Job changed; retry the request');
+    }
+  }
+
+  private async replace(
+    method: 'patch' | 'delete',
+    jobId: string,
+    update: UpdateJob,
+    found: StoredJob,
+    strict: boolean,
+  ): Promise<VersionedJob> {
     const source: JobSource = {
       ...found.source,
       ...(method === 'patch'
         ? { ...update, updated: update.updated || new Date().toISOString() }
         : { deleted: true }),
-      _registry: {
-        revision: randomUUID(),
-        creationFingerprint: found.source._registry?.creationFingerprint,
-      },
+      ...(found.source._registry && {
+        _registry: {
+          etag: randomUUID(),
+          creationFingerprint: found.source._registry.creationFingerprint,
+        },
+      }),
     };
+    this.debug('job_mutation_write', {
+      operation: method,
+      job_id: jobId,
+      mode: strict ? 'strict' : 'unconditional',
+    });
     try {
       return versioned(
         await this.store.replace(source, found.concurrencyToken),
       );
     } catch (error: unknown) {
       if (error instanceof JobStoreConflictError) {
-        throw new PreconditionFailedException('Job changed; read it again');
+        if (strict) {
+          throw new PreconditionFailedException('Job changed; read it again');
+        }
       }
       throw error;
     }
   }
 
   listUserJobs(input: ListUserJobs): Promise<JobPage> {
-    return this.list('user', input, () => ({
+    return this.list(input, () => ({
       filters: { backend_id: input.backend_id, user_ids: [input.user_id] },
       fields: input.fields || JOB_FIELDS.filter((field) => field !== 'process'),
       limit: input.limit,
@@ -229,7 +307,7 @@ export class JobRegistryService {
   }
 
   listActiveJobs(input: ListActiveJobs): Promise<JobPage> {
-    return this.list('active', input, () => {
+    return this.list(input, () => {
       return {
         filters: {
           backend_id: input.backend_id,
@@ -244,7 +322,7 @@ export class JobRegistryService {
   }
 
   listCleanupCandidates(input: ListCleanupCandidates): Promise<JobPage> {
-    return this.list('cleanup', input, () => ({
+    return this.list(input, () => ({
       filters: {
         backend_id: input.backend_id,
         statuses: ['queued', 'running', 'finished', 'error', 'canceled'],
@@ -257,18 +335,11 @@ export class JobRegistryService {
   }
 
   private list(
-    kind: 'user' | 'active' | 'cleanup',
     input: ListJobs,
     buildSearch: () => SearchJobs,
   ): Promise<JobPage> {
     return this.execute(async () => {
-      const { next_page, ...parameters } = input;
-      const fingerprint = hash({ kind, parameters });
-      if (next_page && next_page.fingerprint !== fingerprint) {
-        throw new BadRequestException(
-          'Continuation does not match listing parameters',
-        );
-      }
+      const { next_page } = input;
       const asOf = next_page?.as_of || new Date(Date.now()).toISOString();
       const cutoff = (days: number | undefined): string | undefined => {
         if (days === undefined) return undefined;
@@ -295,7 +366,7 @@ export class JobRegistryService {
         next_page:
           page.next_position === null
             ? null
-            : { fingerprint, as_of: asOf, position: page.next_position },
+            : { as_of: asOf, position: page.next_position },
       };
     });
   }

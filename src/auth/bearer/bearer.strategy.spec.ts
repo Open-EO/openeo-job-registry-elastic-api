@@ -56,7 +56,7 @@ describe('BearerStrategy', () => {
 
     expect(verifyMock).toBeCalledTimes(1);
     expect(verified.mock.calls.length).toEqual(1);
-    expect(verified.mock.calls[0]).toEqual([null, {}, null]);
+    expect(verified.mock.calls[0]).toEqual([null, { sub: undefined }, null]);
     expect(mockCachingService.store).toBeCalledTimes(1);
   });
 
@@ -151,7 +151,11 @@ describe('BearerStrategy', () => {
     it('should verify the token when it has one of the required roles', async () => {
       const { verified, warnSpy } = await verifyWithRoles(buildToken(payload));
 
-      expect(verified.mock.calls[0]).toEqual([null, {}, null]);
+      expect(verified.mock.calls[0]).toEqual([
+        null,
+        { sub: payload.sub },
+        null,
+      ]);
       expect(mockCachingService.store).toBeCalledTimes(1);
       expect(warnSpy).not.toBeCalled();
     });

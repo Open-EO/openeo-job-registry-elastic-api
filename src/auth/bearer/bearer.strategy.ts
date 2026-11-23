@@ -97,7 +97,7 @@ export class BearerStrategy extends PassportStrategy(Strategy, 'bearer') {
     let attempt = 1;
     let introspectResult;
 
-    this.logger.debug(`Start verification of token: ${token}`);
+    this.logger.debug('Start bearer token verification');
     while (attempt <= attempts) {
       this.logger.debug(`Inspecting token (${attempt}/${attempts})`);
       introspectResult = await this.introspectToken(token);
@@ -137,14 +137,14 @@ export class BearerStrategy extends PassportStrategy(Strategy, 'bearer') {
         );
         if (response.active) {
           this.logger.debug('Token is valid');
+          const payload = this.decodePayload(token);
           if (this.requiredRoles.length > 0) {
-            const payload = this.decodePayload(token);
             if (!this.hasRequiredRole(payload)) {
               this.logger.warn(
                 `Access denied for user ${payload.sub}
                  : token has none of the required roles [${this.requiredRoles.join(
-                  ', ',
-                )}]`,
+                   ', ',
+                 )}]`,
               );
               return {
                 error: new ForbiddenException(),
@@ -155,7 +155,9 @@ export class BearerStrategy extends PassportStrategy(Strategy, 'bearer') {
           }
           return {
             error: null,
-            user: {},
+            user: {
+              sub: typeof payload.sub === 'string' ? payload.sub : undefined,
+            },
             info: null,
           };
         } else {
@@ -167,8 +169,8 @@ export class BearerStrategy extends PassportStrategy(Strategy, 'bearer') {
           // See strategy.js for more information on the implementation
           return {
             error: null,
-            user: null,
-            info: VERIFICATION_ERRORS.TOKEN_INVALID,
+            user: {},
+            info: null,
           };
         }
       } catch (e) {

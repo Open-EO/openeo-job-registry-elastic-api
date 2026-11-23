@@ -39,17 +39,23 @@ Listings span backends unless `backend_id` is supplied. All listings accept opti
 are day counts; their cutoffs remain fixed across pages. Responses include a
 structured `next_page` continuation to resend in the next request body. There is no
 public v2 generic search endpoint.
-Both currently use the same Elasticsearch index. See the
-[domain API design and migration guide](docs/domain-api.md) for typed filters,
-CRUD, pagination, storage adapter boundaries and compatibility limits.
+Both currently use the same Elasticsearch index.
 Shared behavior lives in `JobRegistryService`; `JobStore` adapters implement
 atomic create/read/conditional replacement and typed searches.
 V2 uses globally unique job IDs as document IDs, replayable creation and
-ETag/If-Match conditional writes. Creating an existing job in the same backend
+optional ETag/If-Match support. Creating an existing job in the same backend
 returns its current state without overwriting it only when the submitted body
 matches the original creation input; different input returns 409. Only a creation
-fingerprint is retained, not response history. Mutation retries with stale ETags
-return 412.
+fingerprint is retained, not response history. `If-Match` is optional;
+strict writes retain stale-ETag protection, while unconditional writes are
+attempted once and return 409 on a concurrency conflict for the client to retry.
+A stale PATCH whose
+requested fields are already applied returns the current job without another
+write; repeated DELETE of a tombstone returns 204. The registry does not enforce
+status transition order, and `created` cannot be patched. Registry and store
+debug logs trace operations and decisions; they do not include
+request bodies, headers, ETags, or tokens. Unconditional writes also log the
+route and job ID at info level.
 Existing random/hashed-ID records
 require explicit migration before v2 direct access; legacy routes are unchanged.
 

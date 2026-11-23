@@ -5,7 +5,6 @@ import {
   PreconditionFailedException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { createHash } from 'crypto';
 import { JobRegistryService } from './job-registry.service';
 import { ListJobs, SearchJobs } from '../models/job.v2.dto';
 import {
@@ -22,6 +21,13 @@ import {
 class MemoryJobStore extends JobStore {
   private readonly records = new Map<string, StoredJob>();
   private writes = 0;
+  conflictsRemaining = 0;
+  persistentConflicts = false;
+  replaceAttempts = 0;
+
+  get writeCount(): number {
+    return this.writes;
+  }
 
   private snapshot(record: StoredJob): StoredJob {
     return JSON.parse(JSON.stringify(record));
@@ -31,7 +37,6 @@ class MemoryJobStore extends JobStore {
     this.writes++;
     const record = this.snapshot({
       source,
-      version: `memory-version-${this.writes}`,
       concurrencyToken: `memory-token-${this.writes}`,
     });
     this.records.set(source.job_id, record);
@@ -53,6 +58,11 @@ class MemoryJobStore extends JobStore {
     source: JobSource,
     concurrencyToken: string,
   ): Promise<StoredJob> {
+    this.replaceAttempts++;
+    if (this.persistentConflicts || this.conflictsRemaining > 0) {
+      if (!this.persistentConflicts) this.conflictsRemaining--;
+      throw new JobStoreConflictError();
+    }
     if (
       this.records.get(source.job_id)?.concurrencyToken !== concurrencyToken
     ) {
@@ -74,7 +84,7 @@ describe('JobRegistryService with a non-Elasticsearch store', () => {
     parent_id: 'parent-a',
     job_options: { b: 2, a: 1 },
   };
-  const key = { job_id: '1' };
+  const key = '1';
 
   beforeEach(() => {
     store = new MemoryJobStore();
@@ -92,7 +102,7 @@ describe('JobRegistryService with a non-Elasticsearch store', () => {
     expect(first.job).not.toHaveProperty('deleted');
     const record = await store.get('1');
     expect(record.source._registry).toEqual({
-      revision: expect.any(String),
+      etag: expect.any(String),
       creationFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
     const replay = await registry.create({
@@ -101,6 +111,17 @@ describe('JobRegistryService with a non-Elasticsearch store', () => {
     });
     expect(replay).toEqual(first);
     expect(await store.get('1')).toEqual(record);
+  });
+
+  it('explains when a create conflict cannot be reconciled with an existing job', async () => {
+    jest.spyOn(store, 'create').mockRejectedValue(new JobStoreConflictError());
+    jest.spyOn(store, 'get').mockRejectedValue(new JobStoreNotFoundError());
+
+    await expect(registry.create(input)).rejects.toMatchObject({
+      status: 409,
+      message:
+        'Job creation conflicted, but no existing job could be found to reconcile the request',
+    });
   });
 
   it.each([
@@ -124,12 +145,12 @@ describe('JobRegistryService with a non-Elasticsearch store', () => {
     const changed = await registry.patch(
       key,
       { status: 'running', usage: { cpu: { value: 1 } } },
-      { ifMatch: first.etag },
+      first.etag,
     );
     const next = await registry.patch(
       key,
       { usage: { ram: { value: 2 } } },
-      { ifMatch: changed.etag },
+      changed.etag,
     );
     expect(next.job.usage).toEqual({ ram: { value: 2 } });
     expect(next.etag).not.toBe(changed.etag);
@@ -142,20 +163,10 @@ describe('JobRegistryService with a non-Elasticsearch store', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('checks user scope independently of the adapter', async () => {
+  it('gets jobs by globally unique job ID', async () => {
     const first = await registry.create(input);
-    await expect(
-      registry.get({ ...key, user_id: 'bob' }),
-    ).rejects.toBeInstanceOf(NotFoundException);
-    await expect(
-      registry.patch(
-        { ...key, user_id: 'bob' },
-        { status: 'running' },
-        { ifMatch: first.etag },
-      ),
-    ).rejects.toBeInstanceOf(NotFoundException);
-    expect(await registry.get({ ...key, user_id: 'alice' })).toEqual(first);
-    await expect(registry.get({ job_id: 'absent' })).rejects.toBeInstanceOf(
+    expect(await registry.get(key)).toEqual(first);
+    await expect(registry.get('absent')).rejects.toBeInstanceOf(
       NotFoundException,
     );
   });
@@ -164,7 +175,7 @@ describe('JobRegistryService with a non-Elasticsearch store', () => {
     const first = await registry.create(input);
     const results = await Promise.allSettled(
       (['running', 'queued'] as const).map((status) =>
-        registry.patch(key, { status }, { ifMatch: first.etag }),
+        registry.patch(key, { status }, first.etag),
       ),
     );
     expect(
@@ -175,69 +186,240 @@ describe('JobRegistryService with a non-Elasticsearch store', () => {
     );
     expect(failures[0].reason).toBeInstanceOf(PreconditionFailedException);
     await expect(
-      registry.patch(key, { status: 'finished' }, { ifMatch: first.etag }),
+      registry.patch(key, { status: 'finished' }, first.etag),
     ).rejects.toBeInstanceOf(PreconditionFailedException);
   });
 
-  it('detects writes that restore identical content without changing the app revision', async () => {
+  it('invalidates old ETags when v2 writes restore an earlier field value', async () => {
     const first = await registry.create(input);
-    const original = await store.get('1');
-    const intermediate = await store.replace(
-      { ...original.source, status: 'running' },
-      original.concurrencyToken,
+    const intermediate = await registry.patch(
+      key,
+      { status: 'running' },
+      first.etag,
     );
-    await store.replace(original.source, intermediate.concurrencyToken);
-    const current = await registry.get(key);
-    expect(current.job).toEqual(first.job);
+    const current = await registry.patch(
+      key,
+      { status: 'created' },
+      intermediate.etag,
+    );
+    expect(current.job.status).toBe(first.job.status);
     expect(current.etag).not.toBe(first.etag);
     await expect(
-      registry.patch(key, { status: 'finished' }, { ifMatch: first.etag }),
+      registry.patch(key, { status: 'finished' }, first.etag),
     ).rejects.toBeInstanceOf(PreconditionFailedException);
   });
 
-  it('retains the existing ETag representation for numeric storage versions', async () => {
+  it('keeps legacy jobs without registry metadata readable and mutable without inventing a creation fingerprint', async () => {
+    await store.create({ ...input, status: 'created' });
+    const first = await registry.get(key);
+    const changed = await registry.patch(key, { title: 'updated' }, first.etag);
+    expect(changed.job.title).toBe('updated');
+    expect(changed.etag).not.toBe(first.etag);
+    expect((await store.get(key)).source._registry).toBeUndefined();
+    await expect(registry.create(input)).rejects.toMatchObject({
+      status: 409,
+      message: 'Original creation input is unavailable for this job',
+    });
+  });
+
+  it('returns the stored ETag', async () => {
     await registry.create(input);
     const record = await store.get('1');
-    jest.spyOn(store, 'get').mockResolvedValue({ ...record, version: 7 });
     const response = await registry.get(key);
-    const expected = JSON.stringify({
-      deleted: false,
-      documentVersion: 7,
-      job: Object.fromEntries(
-        Object.entries({ ...response.job, job_options: { a: 1, b: 2 } }).sort(
-          ([a], [b]) => a.localeCompare(b),
-        ),
-      ),
-      revision: record.source._registry.revision,
-    });
-    expect(response.etag).toBe(
-      `"${createHash('sha256').update(expected).digest('hex')}"`,
-    );
+    expect(response.etag).toBe(`"${record.source._registry.etag}"`);
   });
 
   it('soft-deletes without allowing retries to overwrite or resurrect the job', async () => {
     const first = await registry.create(input);
-    await registry.delete(key, { ifMatch: first.etag });
+    await registry.delete(key, first.etag);
     expect((await store.get('1')).source.deleted).toBe(true);
     await expect(registry.get(key)).rejects.toBeInstanceOf(NotFoundException);
     await expect(registry.create(input)).rejects.toBeInstanceOf(
       ConflictException,
     );
+    await expect(registry.delete(key, first.etag)).resolves.toBeUndefined();
+    expect(store.writeCount).toBe(2);
+  });
+
+  it('allows PATCH and DELETE without If-Match', async () => {
+    await registry.create(input);
     await expect(
-      registry.delete(key, { ifMatch: first.etag }),
+      registry.patch(key, { title: 'stateless' }, undefined),
+    ).resolves.toMatchObject({ job: { title: 'stateless' } });
+    await expect(registry.delete(key, undefined)).resolves.toBeUndefined();
+    const writes = store.writeCount;
+    await expect(registry.delete(key, undefined)).resolves.toBeUndefined();
+    expect(store.writeCount).toBe(writes);
+    await expect(registry.delete('missing', undefined)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('returns the current job for a strict retry already applied without another write', async () => {
+    const first = await registry.create(input);
+    const changed = await registry.patch(key, { status: 'queued' }, first.etag);
+    const writes = store.writeCount;
+    await expect(
+      registry.patch(key, { status: 'queued' }, first.etag),
+    ).resolves.toEqual(changed);
+    expect(store.writeCount).toBe(writes);
+  });
+
+  it('returns 412 for a strict stale retry with a different patch', async () => {
+    const first = await registry.create(input);
+    await registry.patch(key, { status: 'queued' }, first.etag);
+    await expect(
+      registry.patch(key, { status: 'running' }, first.etag),
     ).rejects.toBeInstanceOf(PreconditionFailedException);
   });
 
-  it('validates preconditions, empty updates and age range before store access', async () => {
+  it('returns 204 for a DELETE retry with an old ETag and performs no extra write', async () => {
+    const first = await registry.create(input);
+    await registry.delete(key, first.etag);
+    const writes = store.writeCount;
+    await expect(registry.delete(key, first.etag)).resolves.toBeUndefined();
+    expect(store.writeCount).toBe(writes);
+  });
+
+  it.each(['patch', 'delete'] as const)(
+    'does not retry a strict %s after a storage conflict',
+    async (method) => {
+      const first = await registry.create(input);
+      store.persistentConflicts = true;
+      const operation =
+        method === 'patch'
+          ? registry.patch(key, { title: 'updated' }, first.etag)
+          : registry.delete(key, first.etag);
+
+      await expect(operation).rejects.toBeInstanceOf(
+        PreconditionFailedException,
+      );
+      expect(store.replaceAttempts).toBe(1);
+      expect(store.writeCount).toBe(1);
+    },
+  );
+
+  it.each(['unconditional', 'strict'] as const)(
+    'does not enforce status transition order on the %s path',
+    async (path) => {
+      const created = await registry.create({ ...input, status: 'finished' });
+      const options = path === 'strict' ? created.etag : undefined;
+
+      await expect(
+        registry.patch(key, { status: 'queued' }, options),
+      ).resolves.toMatchObject({ job: { status: 'queued' } });
+    },
+  );
+
+  it.each(['unconditional', 'strict'] as const)(
+    'allows started and finished timestamps to be set only once on the %s path',
+    async (path) => {
+      const created = await registry.create(input);
+      const options = (etag?: string) => (path === 'strict' ? etag : undefined);
+      const started = '2026-11-10T00:00:00Z';
+      const first = await registry.patch(
+        key,
+        { started },
+        options(created.etag),
+      );
+      await expect(
+        registry.patch(key, { started }, options(first.etag)),
+      ).resolves.toMatchObject({ job: { started } });
+      await expect(
+        registry.patch(
+          key,
+          { started: '2026-11-11T00:00:00Z' },
+          options(first.etag),
+        ),
+      ).rejects.toMatchObject({ status: 409 });
+      const current = await registry.get(key);
+      const finished = '2026-11-12T00:00:00Z';
+      const withFinished = await registry.patch(
+        key,
+        { finished },
+        options(current.etag),
+      );
+      await expect(
+        registry.patch(
+          key,
+          { finished: '2026-11-13T00:00:00Z' },
+          options(withFinished.etag),
+        ),
+      ).rejects.toMatchObject({ status: 409 });
+    },
+  );
+
+  it('allows the client to retry a conflicting unconditional update', async () => {
+    await registry.create(input);
+    store.conflictsRemaining = 1;
+    await expect(registry.patch(key, { input_pixel: 1 })).rejects.toMatchObject(
+      { status: 409 },
+    );
+    expect(store.replaceAttempts).toBe(1);
+    await registry.patch(key, { usage: { ram: { value: 2 } } });
+    await registry.patch(key, { input_pixel: 1 });
+    const final = await registry.get(key);
+    expect(final.job).toMatchObject({
+      usage: { ram: { value: 2 } },
+      input_pixel: 1,
+    });
+  });
+
+  it('preserves concurrent updates to different fields when the client retries the conflict', async () => {
+    await registry.create(input);
+    const updates = [
+      { usage: { ram: { value: 2 } } },
+      { results_metadata_uri: 's3://results/1.json' },
+    ];
+    const results = await Promise.allSettled(
+      updates.map((update) => registry.patch(key, update)),
+    );
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1);
+    const conflictIndex = results.findIndex(
+      (result) => result.status === 'rejected',
+    );
+    expect(results[conflictIndex]).toMatchObject({
+      status: 'rejected',
+      reason: expect.objectContaining({ status: 409 }),
+    });
+    expect(store.replaceAttempts).toBe(2);
+    await registry.patch(key, updates[conflictIndex]);
+    expect((await registry.get(key)).job).toMatchObject({
+      usage: { ram: { value: 2 } },
+      results_metadata_uri: 's3://results/1.json',
+    });
+    expect(store.replaceAttempts).toBe(3);
+  });
+
+  it.each(['patch', 'delete'] as const)(
+    'does not retry an unconditional %s after a storage conflict',
+    async (method) => {
+      await registry.create(input);
+      store.persistentConflicts = true;
+      const get = jest.spyOn(store, 'get');
+      const operation =
+        method === 'patch'
+          ? registry.patch(key, { title: 'updated' })
+          : registry.delete(key);
+      await expect(operation).rejects.toMatchObject({
+        status: 409,
+        message: 'Job changed; retry the request',
+      });
+      expect(get).toHaveBeenCalledTimes(1);
+      expect(store.replaceAttempts).toBe(1);
+      expect(store.writeCount).toBe(1);
+    },
+  );
+
+  it('validates supplied preconditions, empty updates and age range before store access', async () => {
     const get = jest.spyOn(store, 'get');
-    await expect(
-      registry.patch(key, { status: 'running' }, { ifMatch: undefined }),
-    ).rejects.toMatchObject({ status: 428 });
-    await expect(registry.delete(key, { ifMatch: '*' })).rejects.toBeInstanceOf(
+    await expect(registry.delete(key, '*')).rejects.toBeInstanceOf(
       BadRequestException,
     );
     await expect(
-      registry.patch(key, {}, { ifMatch: `"${'0'.repeat(64)}"` }),
+      registry.patch(key, {}, `"${'0'.repeat(64)}"`),
     ).rejects.toBeInstanceOf(BadRequestException);
     await expect(
       registry.listActiveJobs({
@@ -263,7 +445,6 @@ describe('JobRegistryService with a non-Elasticsearch store', () => {
     });
     expect(response.next_page).toEqual({
       as_of: expect.any(String),
-      fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
       position: { created: 1000, job_id: 'j-next' },
     });
     expect(response.jobs[0]).not.toHaveProperty('_registry');
@@ -318,14 +499,20 @@ describe('JobRegistryService with a non-Elasticsearch store', () => {
         ...original,
         position: { created: 1000, job_id: 'j-next' },
       });
-      await expect(
-        list({
-          ...query,
-          max_age: 31,
-          next_page: first.next_page,
-        }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-      expect(store.search).toHaveBeenCalledTimes(2);
+      await list({
+        ...query,
+        max_age: 31,
+        next_page: first.next_page,
+      });
+      expect(store.search).toHaveBeenCalledTimes(3);
+      expect(store.search.mock.calls[2][0]).toEqual({
+        ...original,
+        filters: {
+          ...original.filters,
+          created_since: '2026-10-10T12:00:00.000Z',
+        },
+        position: { created: 1000, job_id: 'j-next' },
+      });
       now.mockRestore();
     },
   );
@@ -337,24 +524,6 @@ describe('JobRegistryService with a non-Elasticsearch store', () => {
     jest.spyOn(store, 'get').mockRejectedValue(error);
     await expect(registry.get(key)).rejects.toBeInstanceOf(expected);
   });
-
-  it.each(['0'.repeat(64), '1'.repeat(64)])(
-    'rejects a mismatched continuation fingerprint %j without accessing storage',
-    async (fingerprint) => {
-      await expect(
-        registry.listUserJobs({
-          user_id: 'alice',
-          limit: 10,
-          next_page: {
-            as_of: '2026-11-10T00:00:00Z',
-            fingerprint,
-            position: { created: 1000, job_id: 'j-next' },
-          },
-        }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-      expect(store.search).not.toHaveBeenCalled();
-    },
-  );
 
   it('lets the adapter reject invalid positions without exposing its errors', async () => {
     store.search.mockResolvedValueOnce({
