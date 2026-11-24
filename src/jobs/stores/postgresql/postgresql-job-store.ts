@@ -306,8 +306,24 @@ export class PostgresqlJobStore extends JobStore implements OnModuleDestroy {
         }
       }
       const limit = param(search.limit + 1);
+      const columns = search.fields
+        ? [
+            ...new Set([
+              'job_id',
+              'backend_id',
+              'user_id',
+              'created',
+              'present_fields',
+              'deleted',
+              'version',
+              'registry_etag',
+              'creation_fingerprint',
+              ...JOB_FIELDS.filter((field) => search.fields.includes(field)),
+            ]),
+          ].join(', ')
+        : '*';
       const { rows } = await this.pool.query<JobRow>(
-        `SELECT * FROM job_registry_v2
+        `SELECT ${columns} FROM job_registry_v2
          WHERE ${where.join(
            ' AND ',
          )} ORDER BY created DESC NULLS LAST, job_id ASC LIMIT ${limit}`,
