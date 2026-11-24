@@ -205,9 +205,12 @@ describe('Jobs v2 API', () => {
           .send({ status: 'finished' }),
       ),
     );
-    expect(identical.map((response) => response.status).sort()).toEqual([
-      200, 412,
-    ]);
+    expect(identical.some((response) => response.status === 200)).toBe(true);
+    expect(
+      identical.every((response) => [200, 412].includes(response.status)),
+    ).toBe(true);
+    const stored = await esService.get({ index, id: raceJobId });
+    expect(stored.body._version).toBe(3);
   }, 30000);
 
   it('changes the stored ETag on each v2 update, even when a value is restored', async () => {
