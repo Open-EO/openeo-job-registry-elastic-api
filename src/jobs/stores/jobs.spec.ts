@@ -212,6 +212,35 @@ describe('Domain jobs API and legacy compatibility', () => {
     );
   });
 
+  it('rejects v2 writes using an ETag from before a legacy API update', async () => {
+    const legacyUpdatedJob = { ...job, title: 'legacy update' };
+    const legacyUpdatedHit = {
+      ...hit,
+      _seq_no: 5,
+      _source: legacyUpdatedJob,
+    };
+    elastic.search.mockResolvedValueOnce(result([hit]));
+    elastic.get.mockResolvedValueOnce({ body: legacyUpdatedHit });
+
+    await request(app.getHttpServer())
+      .patch('/jobs/j-1')
+      .send({ title: 'legacy update' })
+      .expect(200);
+    expect(elastic.update).toHaveBeenCalled();
+
+    elastic.get.mockResolvedValue({ body: legacyUpdatedHit });
+    await request(app.getHttpServer())
+      .patch(`${base}/j-1`)
+      .set('If-Match', etag)
+      .send({ status: 'running' })
+      .expect(412);
+    await request(app.getHttpServer())
+      .delete(`${base}/j-1`)
+      .set('If-Match', etag)
+      .expect(412);
+    expect(elastic.index).not.toHaveBeenCalled();
+  });
+
   it('returns the stored mutation ETag without rereading', async () => {
     elastic.index.mockResolvedValue({
       body: { _version: 17, _seq_no: 29, _primary_term: 3 },
@@ -596,6 +625,34 @@ describe('Domain jobs API and legacy compatibility', () => {
     expect(elastic.search.mock.calls[1][0].body.search_after).toEqual([
       null,
       null,
+    ]);
+  });
+
+  it('normalizes Elasticsearch missing-date sort sentinels in continuations', async () => {
+    const missingDate = {
+      ...hit,
+      _source: { ...job, job_id: 'j-missing-date', created: undefined },
+      sort: [-9223372036854776000, 'j-missing-date'],
+    };
+    elastic.search.mockResolvedValueOnce(result([missingDate, hit]));
+
+    const first = await request(app.getHttpServer())
+      .post(`${base}/user`)
+      .send({ user_id: 'alice', limit: 1 })
+      .expect(200);
+    expect(first.body.next_page.position).toEqual({
+      created: null,
+      job_id: 'j-missing-date',
+    });
+
+    elastic.search.mockResolvedValueOnce(result([hit]));
+    await request(app.getHttpServer())
+      .post(`${base}/user`)
+      .send({ user_id: 'alice', limit: 1, next_page: first.body.next_page })
+      .expect(200);
+    expect(elastic.search.mock.calls[1][0].body.search_after).toEqual([
+      null,
+      'j-missing-date',
     ]);
   });
 

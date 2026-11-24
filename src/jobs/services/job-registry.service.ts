@@ -57,17 +57,42 @@ function publicJob<T extends Partial<JobSource>>(source: T): T {
 
 function versioned(record: StoredJob): VersionedJob {
   const job = publicJob(record.source);
-  const etag = record.source._registry?.etag || hash(record.concurrencyToken);
+  const etag = hash({
+    job_id: record.source.job_id,
+    revision: record.concurrencyToken,
+  });
   return {
     job,
     etag: `"${etag}"`,
   };
 }
 
+function equivalentFieldValue(
+  field: string,
+  current: unknown,
+  requested: unknown,
+): boolean {
+  if (
+    ['created', 'updated', 'started', 'finished'].includes(field) &&
+    typeof current === 'string' &&
+    typeof requested === 'string'
+  ) {
+    const currentTime = Date.parse(current);
+    const requestedTime = Date.parse(requested);
+    if (Number.isFinite(currentTime) && Number.isFinite(requestedTime)) {
+      return currentTime === requestedTime;
+    }
+  }
+  return canonical(current) === canonical(requested);
+}
+
 function patchAlreadyApplied(current: JobSource, update: UpdateJob): boolean {
-  return Object.keys(update).every(
-    (field) =>
-      canonical(current[field]) === canonical(update[field as keyof UpdateJob]),
+  return Object.keys(update).every((field) =>
+    equivalentFieldValue(
+      field,
+      current[field],
+      update[field as keyof UpdateJob],
+    ),
   );
 }
 

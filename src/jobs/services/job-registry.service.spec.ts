@@ -226,11 +226,25 @@ describe('JobRegistryService with a non-Elasticsearch store', () => {
     });
   });
 
-  it('returns the stored ETag', async () => {
+  it('derives ETags from the storage revision', async () => {
     await registry.create(input);
-    const record = await store.get('1');
     const response = await registry.get(key);
-    expect(response.etag).toBe(`"${record.source._registry.etag}"`);
+    expect(response.etag).toMatch(/^"[a-f0-9]{64}"$/);
+  });
+
+  it('treats equivalent timestamp representations as an already-applied patch', async () => {
+    const first = await registry.create(input);
+    const started = '2026-11-10T12:00:00Z';
+    const changed = await registry.patch(key, { started }, first.etag);
+    const writes = store.writeCount;
+
+    await expect(
+      registry.patch(key, { started: '2026-11-10T12:00:00.000Z' }, first.etag),
+    ).resolves.toEqual(changed);
+    await expect(
+      registry.patch(key, { started: '2026-11-10T12:00:00.000Z' }),
+    ).resolves.toEqual(changed);
+    expect(store.writeCount).toBe(writes);
   });
 
   it('soft-deletes without allowing retries to overwrite or resurrect the job', async () => {

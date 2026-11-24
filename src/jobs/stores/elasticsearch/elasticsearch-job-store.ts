@@ -194,13 +194,15 @@ export class ElasticsearchJobStore extends JobStore {
       const page = hits.slice(0, search.limit);
       const more = hits.length > search.limit;
       const last = page[page.length - 1];
+      const createdSortValue = last?.sort?.[0];
       if (
         more &&
         (!last.sort ||
           last.sort.length !== 2 ||
           !(
-            last.sort[0] === null ||
-            (typeof last.sort[0] === 'number' && Number.isFinite(last.sort[0]))
+            createdSortValue === null ||
+            (typeof createdSortValue === 'number' &&
+              Number.isFinite(createdSortValue))
           ) ||
           !(last.sort[1] === null || typeof last.sort[1] === 'string'))
       ) {
@@ -210,7 +212,11 @@ export class ElasticsearchJobStore extends JobStore {
         jobs: page.map((hit) => hit._source),
         next_position: more
           ? {
-              created: typeof last.sort[0] === 'number' ? last.sort[0] : null,
+              created:
+                typeof createdSortValue === 'number' &&
+                createdSortValue > -Number.MAX_SAFE_INTEGER
+                  ? createdSortValue
+                  : null,
               job_id: typeof last.sort[1] === 'string' ? last.sort[1] : null,
             }
           : null,
