@@ -161,9 +161,6 @@ export class BearerStrategy extends PassportStrategy(Strategy, 'bearer') {
             info: null,
           };
         } else {
-          this.logger.debug(
-            `Introspection response: ${JSON.stringify(response)}`,
-          );
           this.logger.error(`Token is not active`);
           // We pass it through info to indicate that the token is invalid and trigger a fail vs an error.
           // See strategy.js for more information on the implementation
@@ -174,7 +171,7 @@ export class BearerStrategy extends PassportStrategy(Strategy, 'bearer') {
           };
         }
       } catch (e) {
-        this.logger.error(`An error occurred while verifying token: ${e}`);
+        this.logger.error('An error occurred while verifying token');
         return {
           error: VERIFICATION_ERRORS.GENERAL,
           user: null,
