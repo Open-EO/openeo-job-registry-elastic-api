@@ -186,6 +186,8 @@ jobs:
         run: |
           docker build --target elasticsearch \
             -t "$IMAGE_NAME:${{ needs.release.outputs.docker_version }}-elasticsearch" \
+            -t "$IMAGE_NAME:${{ needs.release.outputs.docker_version }}" \
+            -t "$IMAGE_NAME:latest-elasticsearch" \
             -t "$IMAGE_NAME:latest" .
           docker build --target postgresql \
             -t "$IMAGE_NAME:${{ needs.release.outputs.docker_version }}-postgresql" \
