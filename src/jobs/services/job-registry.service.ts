@@ -220,6 +220,11 @@ export class JobRegistryService {
       );
     }
     const hasIfMatch = ifMatch !== undefined;
+    if (hasIfMatch && !/^"[A-Za-z0-9_-]+"$/.test(ifMatch)) {
+      throw new BadRequestException(
+        'If-Match must contain a single strong ETag',
+      );
+    }
     this.debug('job_mutation_selected', {
       operation: method,
       job_id: jobId,
