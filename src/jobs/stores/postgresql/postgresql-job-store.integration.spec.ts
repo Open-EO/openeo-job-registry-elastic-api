@@ -226,7 +226,7 @@ integration('PostgreSQL v2 job registry', () => {
     };
     let fullApp: INestApplication;
     try {
-      const { AppModule } = await import('../../../app.module');
+      const { AppModule } = require('../../../app.module');
       const module = await Test.createTestingModule({ imports: [AppModule] })
         .overrideProvider('BearerStrategy')
         .useValue({})
