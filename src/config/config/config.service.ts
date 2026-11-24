@@ -8,6 +8,7 @@ import {
   schema,
 } from '../schema/config.schema';
 import * as dotenv from 'dotenv';
+import { AuthType } from 'src/auth/models/authtypes.enum';
 
 @Injectable()
 export class ConfigService {
@@ -18,8 +19,32 @@ export class ConfigService {
     convict.addFormats(convict_validator);
     this.config = convict(schema(process.env.JOB_STORE_TYPE));
     this.config.validate({ allowed: 'strict' });
+    this.validateEntraConfig();
     if (this.get('database.jobStore.type') === 'postgresql') {
       this.validatePostgresqlConfig();
+    }
+  }
+
+  private validateEntraConfig(): void {
+    if (this.get('auth.type') === AuthType.ENTRA) {
+      if (
+        !/^https:\/\/login\.microsoftonline\.com\/[0-9a-f-]{36}\/v2\.0$/.test(
+          this.get('auth.entra.issuer'),
+        )
+      ) {
+        throw new Error(
+          'ENTRA_ISSUER must be a tenant-specific Entra v2 issuer',
+        );
+      }
+      for (const key of ['audience', 'roles', 'clientIds']) {
+        if (
+          !this.get(`auth.entra.${key}`)
+            .split(',')
+            .some((v: string) => v.trim())
+        ) {
+          throw new Error(`auth.entra.${key} is required in entra mode`);
+        }
+      }
     }
   }
 
