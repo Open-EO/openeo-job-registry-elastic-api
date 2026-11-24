@@ -8,7 +8,7 @@ import {
   schema,
 } from '../schema/config.schema';
 import * as dotenv from 'dotenv';
-import { AuthType } from 'src/auth/models/authtypes.enum';
+import { AuthType } from '../../auth/models/authtypes.enum';
 
 @Injectable()
 export class ConfigService {
