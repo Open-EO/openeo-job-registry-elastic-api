@@ -232,10 +232,10 @@ describe('Jobs v2 API', () => {
     expect(restored.body.status).toBe(first.body.status);
     expect(restored.headers.etag).not.toBe(first.headers.etag);
     expect(restored.headers.etag).not.toBe(changed.headers.etag);
-    const stored = await esService.get({ index, id: updatedJobId });
-    expect(restored.headers.etag).toBe(
-      `"${stored.body._source._registry.etag}"`,
-    );
+    const current = await request(app.getHttpServer())
+      .get(`${base}/${updatedJobId}`)
+      .expect(200);
+    expect(restored.headers.etag).toBe(current.headers.etag);
     await request(app.getHttpServer())
       .patch(`${base}/${updatedJobId}`)
       .set('If-Match', first.headers.etag)
