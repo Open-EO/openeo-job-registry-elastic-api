@@ -82,9 +82,13 @@ export class ElasticsearchJobStore extends JobStore {
     if (
       source._registry?.processWasSerialized &&
       source.process !== null &&
-      typeof source.process === 'object'
+      (typeof source.process === 'object' || typeof source.process === 'string')
     ) {
-      return { ...source, process: JSON.stringify(source.process) };
+      const process =
+        typeof source.process === 'string'
+          ? JSON.parse(source.process)
+          : source.process;
+      return { ...source, process: JSON.stringify(process) };
     }
     return source;
   }
