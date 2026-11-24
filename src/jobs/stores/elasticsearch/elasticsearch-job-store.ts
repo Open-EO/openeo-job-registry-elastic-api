@@ -70,12 +70,43 @@ export class ElasticsearchJobStore extends JobStore {
       throw new Error('Storage returned invalid concurrency metadata');
     }
     return {
-      source,
+      source: this.fromStorage(source),
       concurrencyToken: JSON.stringify([
         metadata._seq_no,
         metadata._primary_term,
       ]),
     };
+  }
+
+  private fromStorage<T extends Partial<JobSource>>(source: T): T {
+    if (
+      source._registry?.processWasSerialized &&
+      source.process !== null &&
+      typeof source.process === 'object'
+    ) {
+      return { ...source, process: JSON.stringify(source.process) };
+    }
+    return source;
+  }
+
+  private toStorage(source: JobSource): JobSource {
+    if (
+      !source._registry?.processWasSerialized ||
+      typeof source.process !== 'string'
+    ) {
+      return source;
+    }
+    const process: JobSource['process'] = JSON.parse(source.process);
+    if (
+      typeof process !== 'object' ||
+      process === null ||
+      Array.isArray(process)
+    ) {
+      throw new JobStoreInvalidInputError(
+        'process must be an object or a JSON-encoded object',
+      );
+    }
+    return { ...source, process };
   }
 
   get(jobId: string): Promise<StoredJob> {
@@ -95,7 +126,7 @@ export class ElasticsearchJobStore extends JobStore {
       const { body } = await this.elastic.create<estypes.CreateResponse>({
         index: this.index,
         id: source.job_id,
-        body: source,
+        body: this.toStorage(source),
         refresh: 'wait_for',
       });
       return this.record(source, body);
@@ -120,7 +151,7 @@ export class ElasticsearchJobStore extends JobStore {
         if_seq_no: token[0],
         if_primary_term: token[1],
         refresh: 'wait_for',
-        body: source,
+        body: this.toStorage(source),
       });
       return this.record(source, body);
     });
@@ -185,7 +216,12 @@ export class ElasticsearchJobStore extends JobStore {
         body: {
           query,
           track_total_hits: false,
-          _source: search.fields || { excludes: ['_registry', 'deleted'] },
+          _source: search.fields
+            ? [
+                ...search.fields,
+                ...(search.fields.includes('process') ? ['_registry'] : []),
+              ]
+            : { excludes: ['deleted'] },
           sort: [{ created: 'desc' }, { job_id: 'asc' }],
           ...(after ? { search_after: after } : {}),
         },
@@ -209,7 +245,7 @@ export class ElasticsearchJobStore extends JobStore {
         throw new Error('Storage returned an invalid pagination position');
       }
       return {
-        jobs: page.map((hit) => hit._source),
+        jobs: page.map((hit) => this.fromStorage(hit._source)),
         next_position: more
           ? {
               created:

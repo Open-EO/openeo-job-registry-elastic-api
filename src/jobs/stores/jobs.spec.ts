@@ -595,6 +595,18 @@ describe('Domain jobs API and legacy compatibility', () => {
     {
       next_page: {
         as_of: '2026-11-10T00:00:00Z',
+        position: { created: 1e100, job_id: 'j-1' },
+      },
+    },
+    {
+      next_page: {
+        as_of: '2026-11-10T00:00:00Z',
+        position: { created: -1e100, job_id: 'j-1' },
+      },
+    },
+    {
+      next_page: {
+        as_of: '2026-11-10T00:00:00Z',
         position: null,
       },
     },
@@ -858,7 +870,41 @@ describe('Domain jobs API and legacy compatibility', () => {
         .send({ backend_id: 'qa', ...payload })
         .expect(201);
       expect(response.body).toEqual({ ...payload, backend_id: 'qa' });
-      expect(elastic.create.mock.calls[0][0].body).toMatchObject(response.body);
+      const stored = elastic.create.mock.calls[0][0].body;
+      expect(stored).toMatchObject({
+        ...response.body,
+        process: typeof process === 'string' ? JSON.parse(process) : process,
+      });
+      if (typeof process === 'string') {
+        expect(stored._registry.processWasSerialized).toBe(true);
+        elastic.get.mockResolvedValueOnce({
+          body: { ...hit, _source: stored },
+        });
+        await request(app.getHttpServer())
+          .get(`${base}/j-1`)
+          .expect(200, response.body);
+
+        elastic.search.mockResolvedValueOnce(
+          result([{ ...hit, _source: stored }]),
+        );
+        const listing = await request(app.getHttpServer())
+          .post(`${base}/user`)
+          .send({ user_id: 'alice', fields: ['job_id', 'process'] })
+          .expect(200);
+        expect(listing.body.jobs[0].process).toBe(process);
+        expect(elastic.search.mock.calls[0][0].body._source).toContain(
+          '_registry',
+        );
+
+        elastic.create.mockRejectedValueOnce(esError(409));
+        elastic.get.mockResolvedValueOnce({
+          body: { ...hit, _source: stored },
+        });
+        await request(app.getHttpServer())
+          .post(base)
+          .send({ backend_id: 'qa', ...payload })
+          .expect(201, response.body);
+      }
     },
   );
 

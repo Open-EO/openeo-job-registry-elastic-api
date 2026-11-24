@@ -144,7 +144,13 @@ export class JobRegistryService {
         status: input.status || 'created',
         created: input.created || now,
         updated: input.updated || now,
-        _registry: { etag: randomUUID(), creationFingerprint },
+        _registry: {
+          etag: randomUUID(),
+          creationFingerprint,
+          ...(typeof input.process === 'string'
+            ? { processWasSerialized: true }
+            : {}),
+        },
       };
       try {
         const created = await this.store.create(source);
@@ -306,6 +312,9 @@ export class JobRegistryService {
         _registry: {
           etag: randomUUID(),
           creationFingerprint: found.source._registry.creationFingerprint,
+          ...(found.source._registry.processWasSerialized
+            ? { processWasSerialized: true }
+            : {}),
         },
       }),
     };
@@ -370,6 +379,17 @@ export class JobRegistryService {
   ): Promise<JobPage> {
     return this.execute(async () => {
       const { next_page } = input;
+      const positionTimestamp = next_page?.position.created;
+      if (
+        positionTimestamp !== null &&
+        positionTimestamp !== undefined &&
+        (!Number.isFinite(positionTimestamp) ||
+          Math.abs(positionTimestamp) > 8640000000000000)
+      ) {
+        throw new BadRequestException(
+          'Pagination timestamp is outside the supported date range',
+        );
+      }
       const asOf = next_page?.as_of || new Date(Date.now()).toISOString();
       const cutoff = (days: number | undefined): string | undefined => {
         if (days === undefined) return undefined;

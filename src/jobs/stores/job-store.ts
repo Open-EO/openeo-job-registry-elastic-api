@@ -19,6 +19,7 @@ export interface JobPage {
 export interface RegistryState {
   etag: string;
   creationFingerprint: string;
+  processWasSerialized?: boolean;
 }
 
 export type JobSource = Job & { deleted?: boolean; _registry?: RegistryState };

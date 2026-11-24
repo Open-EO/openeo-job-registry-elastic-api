@@ -478,6 +478,20 @@ describe('JobRegistryService with a non-Elasticsearch store', () => {
     },
   );
 
+  it('rejects out-of-range continuation timestamps before searching', async () => {
+    await expect(
+      registry.listUserJobs({
+        user_id: 'alice',
+        limit: 10,
+        next_page: {
+          as_of: '2026-11-10T12:00:00.000Z',
+          position: { created: 1e100, job_id: 'j-next' },
+        },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(store.search).not.toHaveBeenCalled();
+  });
+
   it.each([
     [new JobStoreInvalidInputError('Invalid next_page'), BadRequestException],
     [new JobStoreUnavailableError(), ServiceUnavailableException],

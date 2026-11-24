@@ -441,6 +441,8 @@ export class JobPosition {
   })
   @ValidateIf((_, value) => value !== null)
   @IsNumber()
+  @Min(-8640000000000000)
+  @Max(8640000000000000)
   created: number | null;
 
   @ApiProperty({
