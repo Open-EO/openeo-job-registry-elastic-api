@@ -8,21 +8,22 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+    types: [ opened, synchronize, reopened, closed ]
   workflow_dispatch:
-    branches: [ "main" ]
 env:
   DOCKER_IMAGE_NAME: openeo-job-registry-elastic-api
 jobs:
   build:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     strategy:
       matrix:
         node-version: [26.x]
         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
@@ -33,6 +34,67 @@ jobs:
       run: |
         docker build --target elasticsearch -t job-registry:ci-elasticsearch .
         docker build --target postgresql -t job-registry:ci-postgresql .
+
+  pr-image:
+    needs: build
+    if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set PR image name
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+        run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY,,}-pr-${PR_NUMBER}" >> "$GITHUB_ENV"
+      - name: Build PR container images
+        run: |
+          docker build --target elasticsearch \
+            -t "$IMAGE_NAME:elasticsearch" \
+            -t "$IMAGE_NAME:elasticsearch-${GITHUB_SHA}" .
+          docker build --target postgresql \
+            -t "$IMAGE_NAME:postgresql" \
+            -t "$IMAGE_NAME:postgresql-${GITHUB_SHA}" .
+      - name: Log in to GitHub Container Registry
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Push PR container images
+        run: |
+          docker push "$IMAGE_NAME:elasticsearch"
+          docker push "$IMAGE_NAME:elasticsearch-${GITHUB_SHA}"
+          docker push "$IMAGE_NAME:postgresql"
+          docker push "$IMAGE_NAME:postgresql-${GITHUB_SHA}"
+      - name: Summarize PR images
+        run: |
+          {
+            echo '### PR container images'
+            echo
+            echo "- Elasticsearch: \`$IMAGE_NAME:elasticsearch\`"
+            echo "- PostgreSQL: \`$IMAGE_NAME:postgresql\`"
+            echo "- Commit: \`$GITHUB_SHA\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  pr-image-cleanup:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Delete PR container package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE_NAME: ${{ github.event.repository.name }}-pr-${{ github.event.number }}
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          package_endpoint="/orgs/${owner}/packages/container/${PACKAGE_NAME}"
+          if gh api --silent "$package_endpoint" >/dev/null 2>&1; then
+            gh api --method DELETE "$package_endpoint"
+            echo "Deleted ghcr.io/${owner}/${PACKAGE_NAME}"
+          else
+            echo "No PR image package found for ${PACKAGE_NAME}"
+          fi
 
   release:
     needs: build
@@ -47,7 +109,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Use Node.js 26.x
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 26.x
           cache: 'npm'
