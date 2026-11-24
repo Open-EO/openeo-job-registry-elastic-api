@@ -245,6 +245,14 @@ export class Job extends JobMetadata {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  @ValidateBy({
+    name: 'isUtf8JobId',
+    validator: {
+      validate: (value: unknown) =>
+        typeof value !== 'string' || Buffer.byteLength(value, 'utf8') <= 512,
+      defaultMessage: () => 'job_id must not exceed 512 UTF-8 bytes',
+    },
+  })
   job_id: string;
 
   @ApiProperty()

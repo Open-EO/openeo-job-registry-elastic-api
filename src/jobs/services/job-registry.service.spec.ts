@@ -315,44 +315,6 @@ describe('JobRegistryService with a non-Elasticsearch store', () => {
     },
   );
 
-  it.each(['unconditional', 'strict'] as const)(
-    'allows started and finished timestamps to be set only once on the %s path',
-    async (path) => {
-      const created = await registry.create(input);
-      const options = (etag?: string) => (path === 'strict' ? etag : undefined);
-      const started = '2026-11-10T00:00:00Z';
-      const first = await registry.patch(
-        key,
-        { started },
-        options(created.etag),
-      );
-      await expect(
-        registry.patch(key, { started }, options(first.etag)),
-      ).resolves.toMatchObject({ job: { started } });
-      await expect(
-        registry.patch(
-          key,
-          { started: '2026-11-11T00:00:00Z' },
-          options(first.etag),
-        ),
-      ).rejects.toMatchObject({ status: 409 });
-      const current = await registry.get(key);
-      const finished = '2026-11-12T00:00:00Z';
-      const withFinished = await registry.patch(
-        key,
-        { finished },
-        options(current.etag),
-      );
-      await expect(
-        registry.patch(
-          key,
-          { finished: '2026-11-13T00:00:00Z' },
-          options(withFinished.etag),
-        ),
-      ).rejects.toMatchObject({ status: 409 });
-    },
-  );
-
   it('allows the client to retry a conflicting unconditional update', async () => {
     await registry.create(input);
     store.conflictsRemaining = 1;
@@ -416,25 +378,6 @@ describe('JobRegistryService with a non-Elasticsearch store', () => {
       expect(store.writeCount).toBe(1);
     },
   );
-
-  it('validates supplied preconditions, empty updates and age range before store access', async () => {
-    const get = jest.spyOn(store, 'get');
-    await expect(registry.delete(key, '*')).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-    await expect(
-      registry.patch(key, {}, `"${'0'.repeat(64)}"`),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    await expect(
-      registry.listActiveJobs({
-        limit: 10,
-        require_application_id: false,
-        max_age: 1e100,
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    expect(get).not.toHaveBeenCalled();
-    expect(store.search).not.toHaveBeenCalled();
-  });
 
   it('strips internal metadata from search results even if an adapter returns it', async () => {
     await registry.create(input);

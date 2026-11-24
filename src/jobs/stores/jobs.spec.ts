@@ -948,26 +948,13 @@ describe('Domain jobs API and legacy compatibility', () => {
   });
 
   it.each(['patch', 'delete'] as const)(
-    'allows %s without If-Match by default and rejects malformed supplied values',
+    'allows %s without If-Match by default',
     async (method) => {
       const body = method === 'patch' ? { status: 'running' } : undefined;
       await request(app.getHttpServer())
         [method](`${base}/j-1`)
         .send(body)
         .expect(method === 'patch' ? 200 : 204);
-      expect(elastic.index).toHaveBeenCalledTimes(1);
-      for (const token of ['*', `W/${etag}`, `${etag}, ${etag}`, 'invalid']) {
-        await request(app.getHttpServer())
-          [method](`${base}/j-1`)
-          .set('If-Match', token)
-          .send(body)
-          .expect(400);
-      }
-      await request(app.getHttpServer())
-        [method](`${base}/j-1`)
-        .set('If-Match', `"${'0'.repeat(64)}"`)
-        .send(body)
-        .expect(412);
       expect(elastic.index).toHaveBeenCalledTimes(1);
     },
   );

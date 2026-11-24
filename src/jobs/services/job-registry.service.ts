@@ -57,7 +57,7 @@ function publicJob<T extends Partial<JobSource>>(source: T): T {
 
 function versioned(record: StoredJob): VersionedJob {
   const job = publicJob(record.source);
-  const etag = record.source._registry?.etag || '';
+  const etag = record.source._registry?.etag || hash(record.concurrencyToken);
   return {
     job,
     etag: `"${etag}"`,

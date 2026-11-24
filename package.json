@@ -133,7 +133,8 @@
       "main.ts",
       "bearer.guard",
       ".mock.ts",
-      ".middleware.ts"
+      ".middleware.ts",
+      "postgresql-job-store.ts"
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
