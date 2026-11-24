@@ -47,36 +47,7 @@ export class PostgresqlJobStore
     const ssl = config.getPostgresql('ssl');
     const caFile = config.getPostgresql('caFile');
     this.migrationMode = config.getPostgresql('migrationMode');
-    if (!connectionString) {
-      throw new Error('POSTGRES_URL is required for the PostgreSQL job store');
-    }
-    let url: URL;
-    try {
-      url = new URL(connectionString);
-    } catch {
-      throw new Error('POSTGRES_URL must be a valid PostgreSQL URL');
-    }
-    if (url.protocol !== 'postgres:' && url.protocol !== 'postgresql:') {
-      throw new Error('POSTGRES_URL must be a valid PostgreSQL URL');
-    }
-    if (
-      [
-        'ssl',
-        'sslmode',
-        'sslcert',
-        'sslkey',
-        'sslrootcert',
-        'sslfactory',
-        'sslnegotiation',
-      ].some((key) => url.searchParams.has(key))
-    ) {
-      throw new Error(
-        'Configure PostgreSQL TLS with POSTGRES_SSL and POSTGRES_CA_FILE, not URL parameters',
-      );
-    }
-    if (!ssl && caFile) {
-      throw new Error('POSTGRES_CA_FILE requires POSTGRES_SSL');
-    }
+    const url = new URL(connectionString);
     const user =
       url.searchParams.get('user') ?? decodeURIComponent(url.username);
     const password =

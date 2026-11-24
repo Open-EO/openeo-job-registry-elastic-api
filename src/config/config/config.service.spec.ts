@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from './config.service';
-import { PostgresqlJobStore } from '../../jobs/stores/postgresql/postgresql-job-store';
 
 jest.mock('dotenv', () => ({ config: jest.fn() }));
 
@@ -92,17 +91,61 @@ describe('ConfigService', () => {
       process.env.POSTGRES_MIGRATION_MODE = 'invalid';
       expect(() => new ConfigService()).not.toThrow();
       process.env.JOB_STORE_TYPE = 'postgresql';
+      process.env.POSTGRES_URL = 'postgresql://localhost/jobs';
       expect(() => new ConfigService()).toThrow();
       process.env.POSTGRES_MIGRATION_MODE = 'verify';
       expect(new ConfigService().getPostgresql('migrationMode')).toBe('verify');
     });
 
-    it('requires a PostgreSQL URL when the PostgreSQL store is constructed', () => {
-      process.env.JOB_STORE_TYPE = 'postgresql';
+    it('validates PostgreSQL settings only when selected', () => {
       process.env.POSTGRES_URL = '';
-      expect(() => new PostgresqlJobStore(new ConfigService())).toThrow(
-        'POSTGRES_URL is required',
+      expect(() => new ConfigService()).not.toThrow();
+
+      process.env.JOB_STORE_TYPE = 'postgresql';
+      expect(() => new ConfigService()).toThrow(
+        'POSTGRES_URL is required for the PostgreSQL job store',
       );
+    });
+
+    it.each([
+      ['not-a-url', 'POSTGRES_URL must be a valid PostgreSQL URL'],
+      ['https://localhost/jobs', 'POSTGRES_URL must be a valid PostgreSQL URL'],
+      [
+        'postgresql://localhost/jobs?sslmode=require',
+        'Configure PostgreSQL TLS with POSTGRES_SSL and POSTGRES_CA_FILE, not URL parameters',
+      ],
+      [
+        'postgresql://localhost/jobs?sslrootcert=/tmp/ca.pem',
+        'Configure PostgreSQL TLS with POSTGRES_SSL and POSTGRES_CA_FILE, not URL parameters',
+      ],
+    ])('rejects invalid PostgreSQL URL %s', (url, message) => {
+      process.env.JOB_STORE_TYPE = 'postgresql';
+      process.env.POSTGRES_URL = url;
+      expect(() => new ConfigService()).toThrow(message);
+    });
+
+    it('requires SSL when a PostgreSQL CA file is configured', () => {
+      process.env.JOB_STORE_TYPE = 'postgresql';
+      process.env.POSTGRES_URL = 'postgresql://localhost/jobs';
+      process.env.POSTGRES_SSL = 'false';
+      process.env.POSTGRES_CA_FILE = '/tmp/ca.pem';
+      expect(() => new ConfigService()).toThrow(
+        'POSTGRES_CA_FILE requires POSTGRES_SSL',
+      );
+    });
+
+    it('rejects malformed percent-encoding in PostgreSQL URL credentials', () => {
+      process.env.JOB_STORE_TYPE = 'postgresql';
+      process.env.POSTGRES_URL = 'postgresql://user%ZZ:password@localhost/jobs';
+      expect(() => new ConfigService()).toThrow(
+        'POSTGRES_URL must have valid percent-encoding in credentials',
+      );
+    });
+
+    it('accepts a valid PostgreSQL URL when selected', () => {
+      process.env.JOB_STORE_TYPE = 'postgresql';
+      process.env.POSTGRES_URL = 'postgresql://localhost/jobs';
+      expect(() => new ConfigService()).not.toThrow();
     });
   });
 
