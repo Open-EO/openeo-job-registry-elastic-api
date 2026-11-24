@@ -47,6 +47,7 @@
     "convict-format-with-validator": "^6.2.0",
     "dotenv": "^16.0.3",
     "express-session": "^1.17.3",
+    "jose": "^5.10.0",
     "nestjs-pino": "^4.1.0",
     "openid-client": "^5.2.1",
     "passport": "^0.6.0",

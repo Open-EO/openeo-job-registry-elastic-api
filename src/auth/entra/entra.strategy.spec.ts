@@ -24,10 +24,11 @@ import {
 import { Issuer } from 'openid-client';
 import { ConfigService } from '../../config/config/config.service';
 import { Test } from '@nestjs/testing';
-import { Client } from '@elastic/elasticsearch';
 import * as request from 'supertest';
 import { AppModule } from '../../app.module';
 import { JOB } from '../../jobs/mocks/job.mock';
+import { DatabaseService } from '../../jobs/services/database/database.service';
+import { JobStore } from '../../jobs/stores/job-store';
 
 export const entraOptions: EntraOptions = {
   issuer:
@@ -210,17 +211,25 @@ describe('EntraStrategy', () => {
 
   it('enforces JWT authentication on HTTP job routes and leaves probes unauthenticated', async () => {
     const database = {
-      index: jest.fn().mockResolvedValue({ result: 'created' }),
-      search: jest
-        .fn()
-        .mockResolvedValue({ hits: { hits: [{ _id: 'doc', _source: JOB }] } }),
-      close: jest.fn(),
+      saveJobs: jest.fn().mockImplementation(async (job) => job),
+      queryJobs: jest.fn().mockResolvedValue({
+        jobs: [JOB],
+        pagination: { previous: null, next: null },
+      }),
+    };
+    const jobStore = {
+      checkHealth: jest.fn().mockResolvedValue({
+        name: 'elasticsearch',
+        status: 'up',
+      }),
     };
     const module = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider('BearerStrategy')
       .useValue(strategy)
-      .overrideProvider(Client)
+      .overrideProvider(DatabaseService)
       .useValue(database)
+      .overrideProvider(JobStore)
+      .useValue(jobStore)
       .compile();
     const app = module.createNestApplication();
     await app.init();
@@ -252,7 +261,11 @@ describe('EntraStrategy', () => {
           pagination: { previous: null, next: null },
         });
       await request(app.getHttpServer()).get('/health/ready').expect(200);
-      database.search.mockRejectedValue(new Error('Elastic unavailable'));
+      jobStore.checkHealth.mockResolvedValue({
+        name: 'elasticsearch',
+        status: 'down',
+        errors: ['unavailable'],
+      });
       await request(app.getHttpServer()).get('/health/ready').expect(503);
       await request(app.getHttpServer())
         .get('/health/live')
