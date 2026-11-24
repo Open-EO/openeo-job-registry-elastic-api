@@ -66,21 +66,13 @@ require explicit migration before v2 direct access; legacy routes are unchanged.
 
 ### Container images
 
-Select the image matching `JOB_STORE_TYPE`:
+The Elasticsearch and PostgreSQL image tags now contain the same API runtime.
+The PostgreSQL API image does not include Flyway, Java, or migration files;
+database migrations are run by the separate deployment job.
 
-- Elasticsearch: tags `latest-elasticsearch` or `<version>-elasticsearch`.
-  This image does not include Flyway or a Java runtime.
-- PostgreSQL: tags `latest-postgresql` or `<version>-postgresql`. This image
-  includes Flyway, Java, and the migration files.
-
-The existing `latest` and `<version>` tags remain aliases for the PostgreSQL
-image, which also supports Elasticsearch. To avoid the additional runtime,
-Elasticsearch deployments should explicitly use an Elasticsearch tag.
-
-To build locally, use `docker build --target elasticsearch -t job-registry:elasticsearch .`
-or `docker build --target postgresql -t job-registry:postgresql .`. The default
-target is PostgreSQL for compatibility. The Elasticsearch image cannot be used
-with `JOB_STORE_TYPE=postgresql`: Flyway is required for both migration modes.
+Existing store-specific image tags are retained for compatibility. To build
+locally, use `docker build -t job-registry:api .`; either historical Docker
+target (`elasticsearch` or `postgresql`) also produces this same runtime image.
 
 ### PostgreSQL storage for v2
 
@@ -100,35 +92,23 @@ Continuation positions should not be reused across a backend switch.
      verification. For a trusted private CA, set `POSTGRES_CA_FILE` to
      the PEM bundle path. Set `POSTGRES_SSL=false` only for local testing.
      Do not put SSL parameters in the URL; these settings control TLS.
-   - `POSTGRES_MIGRATION_MODE=auto` (default): run pending migrations on
-     startup before accepting requests. Set it to `verify` to require a
-     separate migration step instead.
 
-2. Choose a migration deployment:
+2. Run database migrations through the separate deployment job before rolling
+   out the API. The application does not run or validate Flyway migrations at
+   startup. Its PostgreSQL health check verifies that `job_registry_v2` is
+   accessible; the API role needs SELECT, INSERT, UPDATE on that table (plus
+   USAGE on the schema), but does not need migration privileges.
 
-   - **Automatic:** grant the application role schema creation and table
-     ownership privileges required by the migrations. Each server runs pending
-     migrations at startup; a PostgreSQL advisory lock serializes replicas.
-   - **Separate deployment step (recommended for production):** use Flyway
-     with migration-role credentials, then start the application with
-     `POSTGRES_MIGRATION_MODE=verify`. Grant the application role SELECT on
-     `flyway_schema_history` and SELECT, INSERT, UPDATE on `job_registry_v2`
-     (plus USAGE on the schema). Verify mode runs `flyway validate` and refuses
-     to start if migrations are pending or differ.
-
-Flyway 13.13.0 and Java are included in the PostgreSQL image. For local startup,
-install Flyway separately and make `flyway` available on `PATH`. Migration
-files in [`sql/migrations/`](sql/migrations/) use Flyway's
+Migration files in [`sql/migrations/`](sql/migrations/) use Flyway's
 `V<version>__<description>.sql` naming convention. Flyway records versions
-and checksums in `flyway_schema_history` and coordinates concurrent migrations.
-Application startup groups pending migrations into a single transaction.
-Do not modify an applied migration; add a new version instead.
-Startup fails on a missing, modified or unapplied migration in verify mode,
-and on migration errors in auto mode. Changes should be compatible with PostgreSQL transactions;
-plan backward-compatible schema changes for rolling deployments and test any
-long-running migrations separately.
+and checksums in `flyway_schema_history`. `V1__initial.sql` creates the complete
+initial schema. Once applied, do not modify it; add a new version instead.
+Changes should be compatible with PostgreSQL
+transactions; plan backward-compatible schema changes for rolling deployments
+and test any long-running migrations separately.
 
-To run Flyway independently, configure its `FLYWAY_URL` as a PostgreSQL JDBC
+For local development, install Flyway separately and configure its
+`FLYWAY_URL` as a PostgreSQL JDBC
 URL, `FLYWAY_USER`, `FLYWAY_PASSWORD`, and `FLYWAY_LOCATIONS` as
 `filesystem:sql/migrations`, and `FLYWAY_GROUP=true`, then run `npm run db:migrate`. Set JDBC TLS options
 as appropriate (for example `sslmode=verify-full` and, for a private CA,
@@ -144,19 +124,23 @@ PostgreSQL settings are used and validated only when `JOB_STORE_TYPE` is
 `postgresql`; the job-store Elasticsearch settings are included only when it is
 `elasticsearch`. Selecting PostgreSQL also disables the legacy `/jobs` API.
 
-The schema stores complete jobs in JSONB and indexes the primary lookup and
-common listing paths. Tune indexes and provision capacity based on measured
-workloads. Writes use atomic version-checked updates; listing continuation uses
-the same creation-time/job-ID ordering as v2 Elasticsearch. The `/health`
-check uses PostgreSQL instead of Elasticsearch when PostgreSQL is selected.
+The PostgreSQL schema stores each `Job` property in a typed column; structured
+values such as `process`, `job_options`, `usage`, `results_metadata`, `links`,
+and `assets` use JSONB. A presence column preserves the distinction between an
+omitted optional field and an explicitly null value. Soft-delete and registry
+concurrency metadata are stored separately from the public job fields. Tune
+indexes and provision capacity based on measured workloads. Writes use atomic
+version-checked updates; listing continuation uses the same creation-time/job-ID
+ordering as v2 Elasticsearch. The `/health` check uses PostgreSQL instead of
+Elasticsearch when PostgreSQL is selected.
 Each `JobStore` implements its own health probe; the health endpoint reports the
 selected backend and authentication status. Elasticsearch checks every
 configured node and reports partial failures as warnings.
 
 To run the PostgreSQL integration tests, set `TEST_POSTGRES_URL` to a
 **dedicated test database** whose user can create and drop schemas, then run
-`npm test -- --runInBand postgresql-job-store.integration.spec.ts flyway.integration.spec.ts`.
-The tests create and remove their own schema and require Flyway on `PATH`.
+`npm test -- --runInBand postgresql-job-store.integration.spec.ts`.
+The tests create and remove their own schema and do not require Flyway.
 Without this variable they are skipped.
 
 ## Installation

@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { readFileSync } from 'fs';
 import { DatabaseError, Pool } from 'pg';
 import { ConfigService } from '../../../config/config/config.service';
-import { Job, SearchJobs } from '../../models/job.v2.dto';
+import { JOB_FIELDS, Job, SearchJobs } from '../../models/job.v2.dto';
 import {
   JobSource,
   JobStore,
@@ -15,11 +15,28 @@ import {
   StoredJobPage,
 } from '../job-store';
 
-interface JobRow {
-  source: JobSource;
+const JOB_JSON_FIELDS = new Set<keyof Job>([
+  'process',
+  'job_options',
+  'dependencies',
+  'usage',
+  'results_metadata',
+  'links',
+  'assets',
+  'unique_process_ids',
+]);
+
+interface JobRow
+  extends Omit<Job, 'created' | 'updated' | 'started' | 'finished'> {
+  created: Date | null;
+  updated: Date | null;
+  started: Date | null;
+  finished: Date | null;
   version: string;
-  created_ms: string | null;
-  job_id: string;
+  deleted: boolean;
+  present_fields: (keyof Job | 'deleted')[];
+  registry_etag: string | null;
+  creation_fingerprint: string | null;
 }
 
 @Injectable()
@@ -90,28 +107,90 @@ export class PostgresqlJobStore extends JobStore implements OnModuleDestroy {
   }
 
   private record(row: JobRow): StoredJob {
-    return { source: row.source, concurrencyToken: row.version };
+    const source: JobSource = {
+      job_id: row.job_id,
+      backend_id: row.backend_id,
+      user_id: row.user_id,
+    };
+    for (const field of row.present_fields) {
+      if (field === 'deleted') {
+        source.deleted = row.deleted;
+      } else if (
+        field !== 'job_id' &&
+        field !== 'backend_id' &&
+        field !== 'user_id'
+      ) {
+        const value = row[field];
+        Object.assign(source, {
+          [field]: value instanceof Date ? value.toISOString() : value,
+        });
+      }
+    }
+    if (row.deleted) source.deleted = true;
+    if (row.registry_etag && row.creation_fingerprint) {
+      source._registry = {
+        etag: row.registry_etag,
+        creationFingerprint: row.creation_fingerprint,
+      };
+    }
+    return { source, concurrencyToken: row.version };
   }
 
-  private timestamp(value: string | null | undefined): number | null {
+  private timestamp(value: string | null | undefined): Date | null {
     if (value == null) return null;
-    const timestamp = Date.parse(value);
-    if (!Number.isFinite(timestamp)) throw new Error('Invalid job timestamp');
+    const timestamp = new Date(value);
+    if (!Number.isFinite(timestamp.getTime()))
+      throw new Error('Invalid job timestamp');
     return timestamp;
+  }
+
+  private jobValues(source: JobSource, fields: (keyof Job)[]): unknown[] {
+    return fields.map((field) => {
+      switch (field) {
+        case 'created':
+          return this.timestamp(source.created);
+        case 'updated':
+          return this.timestamp(source.updated);
+        case 'started':
+          return this.timestamp(source.started);
+        case 'finished':
+          return this.timestamp(source.finished);
+      }
+      const value = source[field];
+      if (JOB_JSON_FIELDS.has(field)) {
+        return value === undefined || value === null
+          ? value
+          : JSON.stringify(value);
+      }
+      return value;
+    });
   }
 
   create(source: JobSource): Promise<StoredJob> {
     return this.execute(async () => {
       this.debug('job_store_create', source.job_id);
-      const { rows } = await this.pool.query<JobRow>(
-        `INSERT INTO job_registry_v2 (job_id, source, created_ms, updated_ms)
-         VALUES ($1, $2, $3, $4) RETURNING source, version, created_ms, job_id`,
+      const columns = [
+        ...JOB_FIELDS,
+        'present_fields',
+        'deleted',
+        'registry_etag',
+        'creation_fingerprint',
+      ];
+      const values = [
+        ...this.jobValues(source, JOB_FIELDS),
         [
-          source.job_id,
-          JSON.stringify(source),
-          this.timestamp(source.created),
-          this.timestamp(source.updated),
+          ...JOB_FIELDS.filter((field) => source[field] !== undefined),
+          ...(source.deleted !== undefined ? ['deleted'] : []),
         ],
+        source.deleted ?? false,
+        source._registry?.etag ?? null,
+        source._registry?.creationFingerprint ?? null,
+      ];
+      const { rows } = await this.pool.query<JobRow>(
+        `INSERT INTO job_registry_v2 (${columns.join(', ')})
+         VALUES (${values.map((_, index) => `$${index + 1}`).join(', ')})
+         RETURNING *`,
+        values,
       );
       return this.record(rows[0]);
     });
@@ -121,7 +200,7 @@ export class PostgresqlJobStore extends JobStore implements OnModuleDestroy {
     return this.execute(async () => {
       this.debug('job_store_get', jobId);
       const { rows } = await this.pool.query<JobRow>(
-        'SELECT source, version, created_ms, job_id FROM job_registry_v2 WHERE job_id = $1',
+        'SELECT * FROM job_registry_v2 WHERE job_id = $1',
         [jobId],
       );
       if (!rows.length) throw new JobStoreNotFoundError();
@@ -134,16 +213,37 @@ export class PostgresqlJobStore extends JobStore implements OnModuleDestroy {
       this.debug('job_store_replace', source.job_id);
       if (!/^[1-9]\d*$/.test(concurrencyToken))
         throw new Error('Invalid concurrency token');
-      const { rows } = await this.pool.query<JobRow>(
-        `UPDATE job_registry_v2 SET source = $2, created_ms = $3, updated_ms = $4, version = version + 1
-         WHERE job_id = $1 AND version = $5::bigint RETURNING source, version, created_ms, job_id`,
+      const fields = JOB_FIELDS.filter((field) => field !== 'job_id');
+      const columns = [
+        ...fields,
+        'present_fields',
+        'deleted',
+        'registry_etag',
+        'creation_fingerprint',
+      ];
+      const values = [
+        ...this.jobValues(source, fields),
         [
-          source.job_id,
-          JSON.stringify(source),
-          this.timestamp(source.created),
-          this.timestamp(source.updated),
-          concurrencyToken,
+          ...JOB_FIELDS.filter((field) => source[field] !== undefined),
+          ...(source.deleted !== undefined ? ['deleted'] : []),
         ],
+        source.deleted ?? false,
+        source._registry?.etag ?? null,
+        source._registry?.creationFingerprint ?? null,
+        source.job_id,
+        concurrencyToken,
+      ];
+      const { rows } = await this.pool.query<JobRow>(
+        `UPDATE job_registry_v2
+         SET ${columns
+           .map((column, index) => `${column} = $${index + 1}`)
+           .join(', ')},
+             version = version + 1
+         WHERE job_id = $${values.length - 1} AND version = $${
+          values.length
+        }::bigint
+         RETURNING *`,
+        values,
       );
       if (!rows.length) throw new JobStoreConflictError();
       return this.record(rows[0]);
@@ -159,32 +259,29 @@ export class PostgresqlJobStore extends JobStore implements OnModuleDestroy {
         values.push(value);
         return `$${values.length}`;
       };
-      const where = ["COALESCE(source->>'deleted', 'false') <> 'true'"];
+      const where = ['deleted = false'];
       for (const [field, value] of [
         ['backend_id', filters.backend_id],
         ['job_id', filters.job_id],
         ['infra_id', filters.infra_id],
       ] as const) {
-        if (value !== undefined)
-          where.push(`source->>'${field}' = ${param(value)}`);
+        if (value !== undefined) where.push(`${field} = ${param(value)}`);
       }
       for (const [field, value] of [
         ['user_id', filters.user_ids],
         ['status', filters.statuses],
       ] as const) {
         if (value !== undefined)
-          where.push(`source->>'${field}' = ANY(${param(value)}::text[])`);
+          where.push(`${field} = ANY(${param(value)}::text[])`);
       }
       if (filters.has_application_id !== undefined) {
         where.push(
-          `source->>'application_id' IS ${
-            filters.has_application_id ? 'NOT ' : ''
-          }NULL`,
+          `application_id IS ${filters.has_application_id ? 'NOT ' : ''}NULL`,
         );
       }
       for (const [field, since, until] of [
-        ['created_ms', filters.created_since, filters.created_until],
-        ['updated_ms', filters.updated_since, filters.updated_until],
+        ['created', filters.created_since, filters.created_until],
+        ['updated', filters.updated_since, filters.updated_until],
       ] as const) {
         if (since !== undefined)
           where.push(`${field} >= ${param(this.timestamp(since))}`);
@@ -200,26 +297,27 @@ export class PostgresqlJobStore extends JobStore implements OnModuleDestroy {
         }
         const idParam = param(job_id);
         if (created === null) {
-          where.push(`created_ms IS NULL AND job_id > ${idParam} COLLATE "C"`);
+          where.push(`created IS NULL AND job_id > ${idParam} COLLATE "C"`);
         } else {
-          const createdParam = param(created);
+          const createdParam = param(new Date(created));
           where.push(
-            `(created_ms < ${createdParam} OR created_ms IS NULL OR (created_ms = ${createdParam} AND job_id > ${idParam} COLLATE "C"))`,
+            `(created < ${createdParam} OR created IS NULL OR (created = ${createdParam} AND job_id > ${idParam} COLLATE "C"))`,
           );
         }
       }
       const limit = param(search.limit + 1);
       const { rows } = await this.pool.query<JobRow>(
-        `SELECT source, version, created_ms, job_id FROM job_registry_v2
+        `SELECT * FROM job_registry_v2
          WHERE ${where.join(
            ' AND ',
-         )} ORDER BY created_ms DESC NULLS LAST, job_id ASC LIMIT ${limit}`,
+         )} ORDER BY created DESC NULLS LAST, job_id ASC LIMIT ${limit}`,
         values,
       );
       const page = rows.slice(0, search.limit);
       const last = page[page.length - 1];
       return {
-        jobs: page.map(({ source }) => {
+        jobs: page.map((row) => {
+          const { source } = this.record(row);
           if (!search.fields) return source;
           const result: Partial<Job> = {};
           for (const field of search.fields) {
@@ -232,8 +330,7 @@ export class PostgresqlJobStore extends JobStore implements OnModuleDestroy {
         next_position:
           rows.length > search.limit
             ? {
-                created:
-                  last.created_ms === null ? null : Number(last.created_ms),
+                created: last.created === null ? null : last.created.getTime(),
                 job_id: last.job_id,
               }
             : null,

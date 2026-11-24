@@ -33,6 +33,44 @@ integration('PostgreSQL v2 job registry', () => {
     user_id: 'alice',
     status: 'running' as const,
   };
+  const allFieldsJob: JobSource = {
+    job_id: 'all-fields',
+    backend_id: 'backend',
+    user_id: 'alice',
+    parent_id: 'parent',
+    process: '{"process_graph":{"load":{"process_id":"load_collection"}}}',
+    job_options: { queue: 'default' },
+    status: 'finished',
+    title: 'migrated',
+    description: null,
+    api_version: '1.2.0',
+    application_id: 'application',
+    proxy_user: 'proxy',
+    infra_id: 'infra',
+    oidc_issuer: 'https://issuer.example',
+    created: '2025-01-01T00:00:00.000Z',
+    updated: '2025-01-01T00:00:01.000Z',
+    started: '2025-01-01T00:00:02.000Z',
+    finished: '2025-01-01T00:00:03.000Z',
+    dependencies: [{ job_id: 'dependency' }],
+    dependency_status: 'available',
+    dependency_usage: '123.45',
+    usage: { cpu: 2 },
+    costs: 1.25,
+    input_pixel: 100,
+    cpu_time_seconds: 10,
+    memory_time_megabyte_seconds: 20,
+    results_metadata: { epsg: 4326 },
+    results_metadata_uri: 's3://bucket/metadata.json',
+    links: ['https://example.test/result'],
+    assets: { result: { href: 's3://bucket/result' } },
+    unique_process_ids: ['load_collection'],
+    deleted: false,
+    _registry: {
+      etag: 'migration-etag',
+      creationFingerprint: 'migration-fingerprint',
+    },
+  };
 
   beforeAll(async () => {
     admin = new Pool({ connectionString: databaseUrl });
@@ -40,6 +78,12 @@ integration('PostgreSQL v2 job registry', () => {
     const url = new URL(databaseUrl);
     url.searchParams.set('options', `-c search_path=${schema}`);
     connectionUrl = url.toString();
+    const setup = new Pool({ connectionString: connectionUrl });
+    try {
+      await setup.query(readFileSync('sql/migrations/V1__initial.sql', 'utf8'));
+    } finally {
+      await setup.end();
+    }
     const previousEnv = process.env;
     process.env = {
       ...previousEnv,
@@ -91,6 +135,13 @@ integration('PostgreSQL v2 job registry', () => {
     }
   });
 
+  it('round-trips every Job field through its typed column', async () => {
+    const source = allFieldsJob;
+    const created = await store.create(source);
+    expect(created).toEqual({ source, concurrencyToken: '1' });
+    await expect(store.get(source.job_id)).resolves.toEqual(created);
+  });
+
   it('implements HTTP creation replay, strict updates, tombstones, and conflicts', async () => {
     await request(app.getHttpServer()).post('/jobs').send({}).expect(404);
     await request(app.getHttpServer())
@@ -137,6 +188,19 @@ integration('PostgreSQL v2 job registry', () => {
       created: '2025-01-01T00:00:00Z',
     };
     const first = await store.create(source);
+    const { rows } = await admin.query(
+      `SELECT backend_id, user_id, status, infra_id, application_id, deleted
+       FROM "${schema}".job_registry_v2 WHERE job_id = $1`,
+      [source.job_id],
+    );
+    expect(rows[0]).toEqual({
+      backend_id: 'backend',
+      user_id: 'alice',
+      status: 'running',
+      infra_id: null,
+      application_id: null,
+      deleted: false,
+    });
     await expect(store.create(source)).rejects.toBeInstanceOf(
       JobStoreConflictError,
     );
