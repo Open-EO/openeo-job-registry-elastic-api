@@ -33,6 +33,13 @@ export interface StoredJobPage {
   next_position: JobPosition | null;
 }
 
+export interface JobStoreHealth {
+  name: string;
+  status: 'up' | 'down';
+  warnings?: string[];
+  errors?: string[];
+}
+
 export class JobStoreConflictError extends Error {}
 export class JobStoreNotFoundError extends Error {}
 export class JobStoreInvalidInputError extends Error {}
@@ -48,6 +55,7 @@ export abstract class JobStore {
     concurrencyToken: string,
   ): Promise<StoredJob>;
   abstract search(search: SearchJobs): Promise<StoredJobPage>;
+  abstract checkHealth(): Promise<JobStoreHealth>;
 
   protected debug(event: string, jobId?: string): void {
     this.logger.debug(

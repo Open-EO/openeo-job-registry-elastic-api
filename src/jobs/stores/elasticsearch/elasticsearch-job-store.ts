@@ -2,8 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
 import { estypes } from '@elastic/elasticsearch';
 import { ResponseError } from '@elastic/elasticsearch/lib/errors';
-import { ConfigService } from '../../config/config/config.service';
-import { SearchJobs } from '../models/job.v2.dto';
+import { ConfigService } from '../../../config/config/config.service';
+import { ElasticsearchHealthProbe } from './elasticsearch-health-probe';
+import { SearchJobs } from '../../models/job.v2.dto';
 import {
   JobSource,
   JobStore,
@@ -11,21 +12,29 @@ import {
   JobStoreInvalidInputError,
   JobStoreNotFoundError,
   JobStoreUnavailableError,
+  JobStoreHealth,
   StoredJob,
   StoredJobPage,
-} from './job-store';
+} from '../job-store';
 
 @Injectable()
 export class ElasticsearchJobStore extends JobStore {
   private readonly index: string;
+  private readonly hosts: string[];
 
   constructor(
     private readonly elastic: ElasticsearchService,
     config: ConfigService,
+    private readonly healthProbe: ElasticsearchHealthProbe,
   ) {
     super();
-    this.index = config.get('database.jobsIdx');
+    this.index = config.getElasticsearch('jobsIdx');
+    this.hosts = config.getElasticsearchHosts();
     this.logger = new Logger(ElasticsearchJobStore.name);
+  }
+
+  checkHealth(): Promise<JobStoreHealth> {
+    return this.healthProbe.check(this.hosts, this.index);
   }
 
   private async execute<T>(operation: () => Promise<T>): Promise<T> {

@@ -26,7 +26,7 @@ describe('Jobs v2 API', () => {
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [JobsModule],
+      imports: [JobsModule.register('elasticsearch')],
     }).compile();
 
     app = moduleFixture.createNestApplication();
@@ -41,7 +41,7 @@ describe('Jobs v2 API', () => {
     );
     esService = moduleFixture.get<ElasticsearchService>(ElasticsearchService);
     configService = moduleFixture.get<ConfigService>(ConfigService);
-    index = configService.get('database.jobsIdx');
+    index = configService.getElasticsearch('jobsIdx');
     await app.init();
   });
 

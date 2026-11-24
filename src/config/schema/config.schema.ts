@@ -1,11 +1,29 @@
 import * as convict from 'convict';
 import { AuthType } from '../../auth/models/authtypes.enum';
+import {
+  DEFAULT_JOB_STORE_TYPE,
+  JOB_STORE_TYPES,
+} from '../../jobs/stores/job-store-types';
 
 export interface AppConfig {
   port: number;
 }
 
-export const schema: convict.Schema<AppConfig> = {
+export const POSTGRESQL_MIGRATION_MODES = ['auto', 'verify'] as const;
+
+export interface PostgresqlConfig {
+  url: string;
+  ssl: boolean;
+  caFile: string;
+  migrationMode: typeof POSTGRESQL_MIGRATION_MODES[number];
+}
+
+export interface ElasticsearchConfig {
+  hosts: string;
+  jobsIdx: string;
+}
+
+export const schema = (jobStoreType: string): convict.Schema<AppConfig> => ({
   general: {
     port: {
       doc: 'Port that is used to bind the API',
@@ -69,19 +87,64 @@ export const schema: convict.Schema<AppConfig> = {
     },
   },
   database: {
-    hosts: {
-      doc: 'Comma seperated value list of elasticsearch hosts to use',
-      format: '*',
-      default: 'http://localhost:9200,http://localhost:9201',
-      env: 'DB_HOSTS',
-      arg: 'db_hosts',
-    },
-    jobsIdx: {
-      doc: 'Name of the ElasticSearch index that will be used to store the job information',
-      format: '*',
-      default: 'openeo-jobs-dev',
-      env: 'DB_JOBS_IDX',
-      arg: 'db_jobs_idx',
+    jobStore: {
+      type: {
+        doc: 'Storage backend for the v2 job registry',
+        format: [...JOB_STORE_TYPES],
+        default: DEFAULT_JOB_STORE_TYPE,
+        env: 'JOB_STORE_TYPE',
+      },
+      ...((jobStoreType ?? DEFAULT_JOB_STORE_TYPE) === 'elasticsearch'
+        ? {
+            elasticsearch: {
+              hosts: {
+                doc: 'Comma separated list of Elasticsearch hosts',
+                format: '*',
+                default: 'http://localhost:9200,http://localhost:9201',
+                env: 'DB_HOSTS',
+                arg: 'db_hosts',
+              },
+              jobsIdx: {
+                doc: 'Elasticsearch index used to store job information',
+                format: '*',
+                default: 'openeo-jobs-dev',
+                env: 'DB_JOBS_IDX',
+                arg: 'db_jobs_idx',
+              },
+            },
+          }
+        : {}),
+      ...(jobStoreType === 'postgresql'
+        ? {
+            postgresql: {
+              url: {
+                doc: 'PostgreSQL connection URL for the job registry',
+                format: 'String',
+                default: '',
+                env: 'POSTGRES_URL',
+                sensitive: true,
+              },
+              ssl: {
+                doc: 'Verify the PostgreSQL server TLS certificate',
+                format: 'Boolean',
+                default: true,
+                env: 'POSTGRES_SSL',
+              },
+              caFile: {
+                doc: 'Optional PEM CA bundle for PostgreSQL TLS',
+                format: 'String',
+                default: '',
+                env: 'POSTGRES_CA_FILE',
+              },
+              migrationMode: {
+                doc: 'Apply migrations on startup or verify they have been applied separately',
+                format: [...POSTGRESQL_MIGRATION_MODES],
+                default: 'auto',
+                env: 'POSTGRES_MIGRATION_MODE',
+              },
+            },
+          }
+        : {}),
     },
     maxResults: {
       doc: 'Max results to return for query',
@@ -134,4 +197,4 @@ export const schema: convict.Schema<AppConfig> = {
       },
     },
   },
-};
+});

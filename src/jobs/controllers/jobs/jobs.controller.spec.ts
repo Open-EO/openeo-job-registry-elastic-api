@@ -19,10 +19,7 @@ describe('JobsController', () => {
         ElasticsearchModule.registerAsync({
           imports: [ConfigModule],
           useFactory: async (configService: ConfigService) => ({
-            nodes: configService
-              .get('database.hosts')
-              .split(',')
-              .map((h) => h.trim()),
+            nodes: configService.getElasticsearchHosts(),
           }),
           inject: [ConfigService],
         }),
@@ -50,7 +47,7 @@ describe('JobsController', () => {
       .spyOn(databaseService, 'saveJobs')
       .mockResolvedValueOnce(JOB);
     expect(await controller.storeJobs(JOB)).toEqual(JOB);
-    expect(db).toBeCalledTimes(1);
+    expect(db).toHaveBeenCalledTimes(1);
   });
 
   it('should search the jobs based on an give query', async () => {
@@ -59,7 +56,7 @@ describe('JobsController', () => {
       .mockResolvedValueOnce({ jobs: [JOB], pagination: {} });
 
     expect(await controller.queryJobs({})).toEqual([JOB]);
-    expect(db).toBeCalledTimes(1);
+    expect(db).toHaveBeenCalledTimes(1);
   });
 
   it('should throw an error when something went wrong when querying the database', async () => {
@@ -68,8 +65,8 @@ describe('JobsController', () => {
       .mockImplementationOnce(() => {
         throw new Error('No can do!');
       });
-    await expect(controller.queryJobs({})).rejects.toThrowError();
-    expect(db).toBeCalledTimes(1);
+    await expect(controller.queryJobs({})).rejects.toThrow();
+    expect(db).toHaveBeenCalledTimes(1);
   });
 
   it('should execute a paginated search for jobs based on an give query', async () => {
@@ -79,7 +76,7 @@ describe('JobsController', () => {
       .mockResolvedValueOnce(expectedResult);
 
     expect(await controller.queryJobsPaginated({}, 20)).toEqual(expectedResult);
-    expect(db).toBeCalledTimes(1);
+    expect(db).toHaveBeenCalledTimes(1);
   });
 
   it('should throw an error when something went wrong when querying the database in paginated search', async () => {
@@ -88,8 +85,8 @@ describe('JobsController', () => {
       .mockImplementationOnce(() => {
         throw new Error('No can do!');
       });
-    await expect(controller.queryJobsPaginated({}, 20)).rejects.toThrowError();
-    expect(db).toBeCalledTimes(1);
+    await expect(controller.queryJobsPaginated({}, 20)).rejects.toThrow();
+    expect(db).toHaveBeenCalledTimes(1);
   });
 
   it('should patch the job', async () => {
@@ -101,8 +98,8 @@ describe('JobsController', () => {
       .mockResolvedValueOnce(JOB);
 
     expect(await controller.patchJob(JOB.job_id, JOB)).toEqual(JOB);
-    expect(dbJob).toBeCalledTimes(1);
-    expect(dbPatch).toBeCalledTimes(1);
+    expect(dbJob).toHaveBeenCalledTimes(1);
+    expect(dbPatch).toHaveBeenCalledTimes(1);
   });
 
   it('should throw an error when job ID does not exists when patching the job', async () => {
@@ -113,9 +110,9 @@ describe('JobsController', () => {
       .spyOn(databaseService, 'patchJob')
       .mockResolvedValueOnce(JOB);
 
-    await expect(controller.patchJob(JOB.job_id, JOB)).rejects.toThrowError();
-    expect(dbJob).toBeCalledTimes(1);
-    expect(dbPatch).toBeCalledTimes(0);
+    await expect(controller.patchJob(JOB.job_id, JOB)).rejects.toThrow();
+    expect(dbJob).toHaveBeenCalledTimes(1);
+    expect(dbPatch).toHaveBeenCalledTimes(0);
   });
 
   it('should update the deleted flag of a job when receiving a delete request', async () => {
@@ -128,9 +125,9 @@ describe('JobsController', () => {
 
     await controller.deleteJob(JOB.job_id);
 
-    expect(dbJob).toBeCalledTimes(1);
-    expect(dbPatch).toBeCalledTimes(1);
-    expect(dbPatch).toBeCalledWith(JOB.job_id, {
+    expect(dbJob).toHaveBeenCalledTimes(1);
+    expect(dbPatch).toHaveBeenCalledTimes(1);
+    expect(dbPatch).toHaveBeenCalledWith(JOB.job_id, {
       deleted: true,
     });
   });
@@ -143,8 +140,8 @@ describe('JobsController', () => {
       .spyOn(databaseService, 'patchJob')
       .mockResolvedValueOnce(JOB);
 
-    await expect(controller.deleteJob(JOB.job_id)).rejects.toThrowError();
-    expect(dbJob).toBeCalledTimes(1);
-    expect(dbPatch).toBeCalledTimes(0);
+    await expect(controller.deleteJob(JOB.job_id)).rejects.toThrow();
+    expect(dbJob).toHaveBeenCalledTimes(1);
+    expect(dbPatch).toHaveBeenCalledTimes(0);
   });
 });

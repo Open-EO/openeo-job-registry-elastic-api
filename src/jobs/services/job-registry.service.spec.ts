@@ -19,6 +19,10 @@ import {
 } from '../stores/job-store';
 
 class MemoryJobStore extends JobStore {
+  async checkHealth() {
+    return { name: 'memory', status: 'up' as const };
+  }
+
   private readonly records = new Map<string, StoredJob>();
   private writes = 0;
   conflictsRemaining = 0;

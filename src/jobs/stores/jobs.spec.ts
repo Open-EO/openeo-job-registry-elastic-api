@@ -5,10 +5,12 @@ import { ResponseError } from '@elastic/elasticsearch/lib/errors';
 import * as request from 'supertest';
 import { JobsModule } from '../jobs.module';
 import { JobStore, JobStoreUnavailableError } from './job-store';
-import { ElasticsearchJobStore } from './elasticsearch-job-store';
+import { ElasticsearchJobStore } from './elasticsearch/elasticsearch-job-store';
+import { ConfigService } from '../../config/config/config.service';
 
 describe('Domain jobs API and legacy compatibility', () => {
   let app: INestApplication;
+  let moduleIndex: string;
   const elastic = {
     search: jest.fn(),
     create: jest.fn(),
@@ -45,11 +47,14 @@ describe('Domain jobs API and legacy compatibility', () => {
     });
 
   beforeAll(async () => {
-    const module = await Test.createTestingModule({ imports: [JobsModule] })
+    const module = await Test.createTestingModule({
+      imports: [JobsModule.register('elasticsearch')],
+    })
       .overrideProvider(ElasticsearchService)
       .useValue(elastic)
       .compile();
     expect(module.get(JobStore)).toBeInstanceOf(ElasticsearchJobStore);
+    moduleIndex = module.get(ConfigService).getElasticsearch('jobsIdx');
     app = module.createNestApplication();
     app.useLogger(false);
     app.useGlobalPipes(
@@ -159,7 +164,10 @@ describe('Domain jobs API and legacy compatibility', () => {
   it('gets an existing job by global ID', async () => {
     await request(app.getHttpServer()).get(`${base}/j-1`).expect(200, job);
     expect(elastic.get).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'j-1' }),
+      expect.objectContaining({
+        id: 'j-1',
+        index: moduleIndex,
+      }),
     );
     expect(elastic.search).not.toHaveBeenCalled();
   });

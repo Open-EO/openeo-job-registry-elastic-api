@@ -11,13 +11,19 @@ import { v4 as uuidv4 } from 'uuid';
 import { CachingModule } from './caching/caching.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { JobStoreType } from './jobs/stores/job-store-types';
+
+const jobStoreType: JobStoreType = new ConfigService().get(
+  'database.jobStore.type',
+);
+const jobsModule = JobsModule.register(jobStoreType);
 
 @Module({
   imports: [
     ConfigModule,
     AuthModule,
-    JobsModule,
-    HealthModule,
+    jobsModule,
+    HealthModule.register(jobsModule),
     UtilsModule,
     LoggerModule.forRootAsync({
       imports: [ConfigModule],

@@ -23,10 +23,7 @@ describe('DatabaseService', () => {
         ElasticsearchModule.registerAsync({
           imports: [ConfigModule],
           useFactory: async (configService: ConfigService) => ({
-            nodes: configService
-              .get('database.hosts')
-              .split(',')
-              .map((h) => h.trim()),
+            nodes: configService.getElasticsearchHosts(),
           }),
           inject: [ConfigService],
         }),
@@ -62,35 +59,35 @@ describe('DatabaseService', () => {
       },
     } as any);
     expect(await service.saveJobs(JOB)).toEqual(JOB);
-    expect(es).toBeCalledTimes(1);
+    expect(es).toHaveBeenCalledTimes(1);
   });
 
   it('should throw an error if the bulk request fails', async () => {
     let es = jest.spyOn(esService, 'index').mockReturnValueOnce({
       statusCode: 400,
     } as any);
-    await expect(service.saveJobs(JOB)).rejects.toThrowError();
+    await expect(service.saveJobs(JOB)).rejects.toThrow();
 
     es = jest.spyOn(esService, 'index').mockImplementationOnce(() => {
       throw Error('No can do!');
     });
-    await expect(service.patchJob(JOB.job_id, JOB)).rejects.toThrowError();
+    await expect(service.patchJob(JOB.job_id, JOB)).rejects.toThrow();
 
-    expect(es).toBeCalledTimes(1);
+    expect(es).toHaveBeenCalledTimes(1);
   });
 
   it('should throw an error if the update job fails', async () => {
     let es = jest.spyOn(esService, 'update').mockReturnValueOnce({
       statusCode: 400,
     } as any);
-    await expect(service.patchJob(JOB.job_id, JOB)).rejects.toThrowError();
+    await expect(service.patchJob(JOB.job_id, JOB)).rejects.toThrow();
 
     es = jest.spyOn(esService, 'update').mockImplementationOnce(() => {
       throw Error('No can do!');
     });
-    await expect(service.patchJob(JOB.job_id, JOB)).rejects.toThrowError();
+    await expect(service.patchJob(JOB.job_id, JOB)).rejects.toThrow();
 
-    expect(es).toBeCalledTimes(2);
+    expect(es).toHaveBeenCalledTimes(2);
   });
 
   it('should patch the job and retrieve the updated result', async () => {
@@ -105,8 +102,8 @@ describe('DatabaseService', () => {
     } as TransportRequestCallback);
 
     expect(await service.patchJob('foobar', JOB)).toEqual(JOB);
-    expect(esUpdate).toBeCalledTimes(1);
-    expect(esGet).toBeCalledTimes(1);
+    expect(esUpdate).toHaveBeenCalledTimes(1);
+    expect(esGet).toHaveBeenCalledTimes(1);
   });
 
   it('should not retry getting the job ID if the request returned an ID', async () => {
@@ -115,7 +112,7 @@ describe('DatabaseService', () => {
       .mockResolvedValue({ jobs: ['foobar_id'], pagination: {} });
 
     const id = await service.getJobDocId('foobar');
-    expect(getJobID).toBeCalledTimes(1);
+    expect(getJobID).toHaveBeenCalledTimes(1);
     expect(id).toEqual('foobar_id');
   });
 
@@ -125,7 +122,7 @@ describe('DatabaseService', () => {
       .mockResolvedValue({ jobs: [], pagination: {} });
 
     const id = await service.getJobDocId('foobar');
-    expect(getJobID).toBeCalledTimes(5);
+    expect(getJobID).toHaveBeenCalledTimes(5);
     expect(id).toBeUndefined();
   });
 
@@ -145,7 +142,7 @@ describe('DatabaseService', () => {
       .mockReturnValueOnce(QUERIES[1].input);
 
     await service.queryJobs(QUERIES[1].input);
-    expect(deletedFilter).toBeCalledTimes(5);
+    expect(deletedFilter).toHaveBeenCalledTimes(5);
   });
 
   it('should not add the deleted filter when querying jobs and deleted flag is set to true', async () => {
@@ -164,7 +161,7 @@ describe('DatabaseService', () => {
       .mockReturnValueOnce(QUERIES[1].input);
 
     await service.queryJobs(QUERIES[1].input, 0, 1, true);
-    expect(deletedFilter).toBeCalledTimes(0);
+    expect(deletedFilter).toHaveBeenCalledTimes(0);
   });
   it('should correctly update the query to filter out deleted documents', async () => {
     let count = 1;

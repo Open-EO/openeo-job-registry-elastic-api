@@ -39,9 +39,14 @@ Listings span backends unless `backend_id` is supplied. All listings accept opti
 are day counts; their cutoffs remain fixed across pages. Responses include a
 structured `next_page` continuation to resend in the next request body. There is no
 public v2 generic search endpoint.
-Both currently use the same Elasticsearch index.
+By default both use the same Elasticsearch index.
+The Elasticsearch connection is configured with `DB_HOSTS` (a comma-separated
+list) and `DB_JOBS_IDX` (the job index).
 Shared behavior lives in `JobRegistryService`; `JobStore` adapters implement
 atomic create/read/conditional replacement and typed searches.
+To add a backend, define its type in `JOB_STORE_TYPES`, its configuration in
+the config schema, and its adapter and optional imports, providers, and
+controllers in the `JobsModule` store registrations.
 V2 uses globally unique job IDs as document IDs, replayable creation and
 optional ETag/If-Match support. Creating an existing job in the same backend
 returns its current state without overwriting it only when the submitted body
@@ -59,7 +64,104 @@ route and job ID at info level.
 Existing random/hashed-ID records
 require explicit migration before v2 direct access; legacy routes are unchanged.
 
+### Container images
+
+Select the image matching `JOB_STORE_TYPE`:
+
+- Elasticsearch: tags `latest-elasticsearch` or `<version>-elasticsearch`.
+  This image does not include Flyway or a Java runtime.
+- PostgreSQL: tags `latest-postgresql` or `<version>-postgresql`. This image
+  includes Flyway, Java, and the migration files.
+
+The existing `latest` and `<version>` tags remain aliases for the PostgreSQL
+image, which also supports Elasticsearch. To avoid the additional runtime,
+Elasticsearch deployments should explicitly use an Elasticsearch tag.
+
+To build locally, use `docker build --target elasticsearch -t job-registry:elasticsearch .`
+or `docker build --target postgresql -t job-registry:postgresql .`. The default
+target is PostgreSQL for compatibility. The Elasticsearch image cannot be used
+with `JOB_STORE_TYPE=postgresql`: Flyway is required for both migration modes.
+
+### PostgreSQL storage for v2
+
+The v2 registry can instead use PostgreSQL 13 or newer, including Azure Database for
+PostgreSQL Flexible Server. When PostgreSQL is selected, the Elasticsearch-only
+legacy `/jobs` API is disabled; its routes return 404. Existing Elasticsearch
+records are not migrated automatically. Plan and verify a migration before
+switching existing clients.
+Continuation positions should not be reused across a backend switch.
+
+1. Provision a PostgreSQL database and configure:
+
+   - `JOB_STORE_TYPE=postgresql` (default: `elasticsearch`)
+   - `POSTGRES_URL`: PostgreSQL connection URL, including database and
+     credentials. Store credentials securely; do not commit them.
+   - `POSTGRES_SSL=true` (default): use TLS with server certificate
+     verification. For a trusted private CA, set `POSTGRES_CA_FILE` to
+     the PEM bundle path. Set `POSTGRES_SSL=false` only for local testing.
+     Do not put SSL parameters in the URL; these settings control TLS.
+   - `POSTGRES_MIGRATION_MODE=auto` (default): run pending migrations on
+     startup before accepting requests. Set it to `verify` to require a
+     separate migration step instead.
+
+2. Choose a migration deployment:
+
+   - **Automatic:** grant the application role schema creation and table
+     ownership privileges required by the migrations. Each server runs pending
+     migrations at startup; a PostgreSQL advisory lock serializes replicas.
+   - **Separate deployment step (recommended for production):** use Flyway
+     with migration-role credentials, then start the application with
+     `POSTGRES_MIGRATION_MODE=verify`. Grant the application role SELECT on
+     `flyway_schema_history` and SELECT, INSERT, UPDATE on `job_registry_v2`
+     (plus USAGE on the schema). Verify mode runs `flyway validate` and refuses
+     to start if migrations are pending or differ.
+
+Flyway 13.13.0 and Java are included in the PostgreSQL image. For local startup,
+install Flyway separately and make `flyway` available on `PATH`. Migration
+files in [`sql/migrations/`](sql/migrations/) use Flyway's
+`V<version>__<description>.sql` naming convention. Flyway records versions
+and checksums in `flyway_schema_history` and coordinates concurrent migrations.
+Application startup groups pending migrations into a single transaction.
+Do not modify an applied migration; add a new version instead.
+Startup fails on a missing, modified or unapplied migration in verify mode,
+and on migration errors in auto mode. Changes should be compatible with PostgreSQL transactions;
+plan backward-compatible schema changes for rolling deployments and test any
+long-running migrations separately.
+
+To run Flyway independently, configure its `FLYWAY_URL` as a PostgreSQL JDBC
+URL, `FLYWAY_USER`, `FLYWAY_PASSWORD`, and `FLYWAY_LOCATIONS` as
+`filesystem:sql/migrations`, and `FLYWAY_GROUP=true`, then run `npm run db:migrate`. Set JDBC TLS options
+as appropriate (for example `sslmode=verify-full` and, for a private CA,
+`sslrootcert`). Keep credentials out of source control and command history.
+Unlike application startup, the Flyway CLI does not use `POSTGRES_URL`.
+
+Flyway refuses to migrate a non-empty schema without history. Its `baseline`
+command can adopt an existing schema, but **does not verify that schema**:
+back up and independently verify it against the initial migration before
+baselining. Existing histories from the earlier custom runner are not adopted.
+
+PostgreSQL settings are used and validated only when `JOB_STORE_TYPE` is
+`postgresql`; the job-store Elasticsearch settings are included only when it is
+`elasticsearch`. Selecting PostgreSQL also disables the legacy `/jobs` API.
+
+The schema stores complete jobs in JSONB and indexes the primary lookup and
+common listing paths. Tune indexes and provision capacity based on measured
+workloads. Writes use atomic version-checked updates; listing continuation uses
+the same creation-time/job-ID ordering as v2 Elasticsearch. The `/health`
+check uses PostgreSQL instead of Elasticsearch when PostgreSQL is selected.
+Each `JobStore` implements its own health probe; the health endpoint reports the
+selected backend and authentication status. Elasticsearch checks every
+configured node and reports partial failures as warnings.
+
+To run the PostgreSQL integration tests, set `TEST_POSTGRES_URL` to a
+**dedicated test database** whose user can create and drop schemas, then run
+`npm test -- --runInBand postgresql-job-store.integration.spec.ts flyway.integration.spec.ts`.
+The tests create and remove their own schema and require Flyway on `PATH`.
+Without this variable they are skipped.
+
 ## Installation
+
+Node.js 26 or newer is required.
 
 ```bash
 $ npm install

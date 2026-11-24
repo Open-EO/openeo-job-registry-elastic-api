@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18.x]
+        node-version: [26.x]
         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
     steps:
     - uses: actions/checkout@v3
@@ -29,6 +29,10 @@ jobs:
     - run: npm install
     - run: npm run test:cov
     - run: npm run build
+    - name: Build container targets
+      run: |
+        docker build --target elasticsearch -t job-registry:ci-elasticsearch .
+        docker build --target postgresql -t job-registry:ci-postgresql .
 
   release:
     needs: build
@@ -42,10 +46,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Use Node.js 18.x
+      - name: Use Node.js 26.x
         uses: actions/setup-node@v3
         with:
-          node-version: 18.x
+          node-version: 26.x
           cache: 'npm'
       - run: npm install
       - id: before
@@ -82,10 +86,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use Node.js 18.x
+      - name: Use Node.js 26.x
         uses: actions/setup-node@v4
         with:
-          node-version: 18.x
+          node-version: 26.x
           cache: npm
 
       - name: Validate version
@@ -111,15 +115,20 @@ jobs:
       - name: Set image name lowercase
         run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/openeo-job-registry-elastic-api" >> "$GITHUB_ENV"
 
-      - name: Build image
-        run: docker build -t "$IMAGE_NAME" .
-
-      - name: Tag image
+      - name: Build images
         run: |
-          docker tag "$IMAGE_NAME" "$IMAGE_NAME:${{ needs.release.outputs.docker_version }}"
-          docker tag "$IMAGE_NAME" "$IMAGE_NAME:latest"
+          docker build --target elasticsearch \
+            -t "$IMAGE_NAME:${{ needs.release.outputs.docker_version }}-elasticsearch" \
+            -t "$IMAGE_NAME:latest" .
+          docker build --target postgresql \
+            -t "$IMAGE_NAME:${{ needs.release.outputs.docker_version }}-postgresql" \
+            -t "$IMAGE_NAME:latest-postgresql" .
 
-      - name: Push image
+      - name: Push images
         run: |
+          docker push "$IMAGE_NAME:${{ needs.release.outputs.docker_version }}-elasticsearch"
+          docker push "$IMAGE_NAME:latest-elasticsearch"
+          docker push "$IMAGE_NAME:${{ needs.release.outputs.docker_version }}-postgresql"
+          docker push "$IMAGE_NAME:latest-postgresql"
           docker push "$IMAGE_NAME:${{ needs.release.outputs.docker_version }}"
           docker push "$IMAGE_NAME:latest"

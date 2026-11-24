@@ -15,7 +15,7 @@ export class DatabaseService {
     private elasticSearch: ElasticsearchService,
     private logger: Logger,
   ) {
-    this.JOBS_INDEX = this.configService.get('database.jobsIdx');
+    this.JOBS_INDEX = this.configService.getElasticsearch('jobsIdx');
 
     this.logger.debug(
       `Starting up databse service for jobs at index ${this.JOBS_INDEX}`,

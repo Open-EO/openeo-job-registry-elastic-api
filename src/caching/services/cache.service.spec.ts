@@ -33,7 +33,7 @@ describe('CacheService', () => {
 
   it('should save the result to the cache', async () => {
     await service.store('foo', 'bar');
-    expect(mockCacheManager.set).toBeCalledTimes(1);
+    expect(mockCacheManager.set).toHaveBeenCalledTimes(1);
   });
 
   it('should not throw an error whenever something went wrong while saving the result to the cache', async () => {
@@ -41,13 +41,13 @@ describe('CacheService', () => {
       throw Error('No way!');
     });
     await service.store('foo', 'bar');
-    expect(mockCacheManager.set).toBeCalledTimes(1);
+    expect(mockCacheManager.set).toHaveBeenCalledTimes(1);
   });
 
   it('should check the result to the cache', async () => {
     jest.spyOn(mockCacheManager, 'get').mockResolvedValue('bar');
     expect(await service.checkCache('foo')).toEqual('bar');
-    expect(mockCacheManager.get).toBeCalledTimes(1);
+    expect(mockCacheManager.get).toHaveBeenCalledTimes(1);
   });
 
   it('should return undefined whenever an error occurred during cache lookup', async () => {
@@ -55,6 +55,6 @@ describe('CacheService', () => {
       throw Error('No way!');
     });
     expect(await service.checkCache('foo')).toEqual(undefined);
-    expect(mockCacheManager.get).toBeCalledTimes(1);
+    expect(mockCacheManager.get).toHaveBeenCalledTimes(1);
   });
 });
