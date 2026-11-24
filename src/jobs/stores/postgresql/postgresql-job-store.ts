@@ -1,16 +1,7 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { readFileSync } from 'fs';
-import { execFile } from 'child_process';
-import { join } from 'path';
-import { promisify } from 'util';
 import { DatabaseError, Pool } from 'pg';
 import { ConfigService } from '../../../config/config/config.service';
-import { PostgresqlConfig } from '../../../config/schema/config.schema';
 import { Job, SearchJobs } from '../../models/job.v2.dto';
 import {
   JobSource,
@@ -32,13 +23,8 @@ interface JobRow {
 }
 
 @Injectable()
-export class PostgresqlJobStore
-  extends JobStore
-  implements OnModuleDestroy, OnModuleInit
-{
+export class PostgresqlJobStore extends JobStore implements OnModuleDestroy {
   private readonly pool: Pool;
-  private readonly migrationMode: PostgresqlConfig['migrationMode'];
-  private readonly flywayEnvironment: NodeJS.ProcessEnv;
 
   constructor(config: ConfigService) {
     super();
@@ -46,48 +32,6 @@ export class PostgresqlJobStore
     const connectionString = config.getPostgresql('url');
     const ssl = config.getPostgresql('ssl');
     const caFile = config.getPostgresql('caFile');
-    this.migrationMode = config.getPostgresql('migrationMode');
-    const url = new URL(connectionString);
-    const user =
-      url.searchParams.get('user') ?? decodeURIComponent(url.username);
-    const password =
-      url.searchParams.get('password') ?? decodeURIComponent(url.password);
-    url.protocol = 'postgresql:';
-    url.username = '';
-    url.password = '';
-    url.searchParams.delete('user');
-    url.searchParams.delete('password');
-    url.searchParams.set('sslmode', ssl ? 'verify-full' : 'disable');
-    if (ssl && caFile) {
-      url.searchParams.set('sslrootcert', caFile);
-    } else if (ssl) {
-      url.searchParams.set(
-        'sslfactory',
-        'org.postgresql.ssl.DefaultJavaSSLFactory',
-      );
-    }
-    this.flywayEnvironment = {
-      ...process.env,
-      FLYWAY_URL: `jdbc:${url.toString()}`,
-      FLYWAY_USER:
-        user ||
-        process.env.PGUSER ||
-        (process.platform === 'win32'
-          ? process.env.USERNAME
-          : process.env.USER) ||
-        '',
-      FLYWAY_PASSWORD: password || process.env.PGPASSWORD || '',
-      FLYWAY_LOCATIONS: `filesystem:${join(
-        process.cwd(),
-        'sql',
-        'migrations',
-      )}`,
-      FLYWAY_VALIDATE_MIGRATION_NAMING: 'true',
-      FLYWAY_FAIL_ON_MISSING_LOCATIONS: 'true',
-      FLYWAY_BASELINE_ON_MIGRATE: 'false',
-      FLYWAY_IGNORE_MIGRATION_PATTERNS: '',
-      FLYWAY_GROUP: 'true',
-    };
     this.pool = new Pool({
       connectionString,
       connectionTimeoutMillis: 5000,
@@ -101,15 +45,6 @@ export class PostgresqlJobStore
     this.pool.on('error', () =>
       this.logger.error('PostgreSQL connection failed'),
     );
-  }
-
-  async onModuleInit(): Promise<void> {
-    const { stdout } = await promisify(execFile)(
-      'flyway',
-      [this.migrationMode === 'auto' ? 'migrate' : 'validate'],
-      { env: this.flywayEnvironment },
-    );
-    this.logger.log(stdout.trim());
   }
 
   async onModuleDestroy(): Promise<void> {

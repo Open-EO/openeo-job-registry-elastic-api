@@ -9,13 +9,10 @@ export interface AppConfig {
   port: number;
 }
 
-export const POSTGRESQL_MIGRATION_MODES = ['auto', 'verify'] as const;
-
 export interface PostgresqlConfig {
   url: string;
   ssl: boolean;
   caFile: string;
-  migrationMode: typeof POSTGRESQL_MIGRATION_MODES[number];
 }
 
 export interface ElasticsearchConfig {
@@ -135,12 +132,6 @@ export const schema = (jobStoreType: string): convict.Schema<AppConfig> => ({
                 format: 'String',
                 default: '',
                 env: 'POSTGRES_CA_FILE',
-              },
-              migrationMode: {
-                doc: 'Apply migrations on startup or verify they have been applied separately',
-                format: [...POSTGRESQL_MIGRATION_MODES],
-                default: 'auto',
-                env: 'POSTGRES_MIGRATION_MODE',
               },
             },
           }

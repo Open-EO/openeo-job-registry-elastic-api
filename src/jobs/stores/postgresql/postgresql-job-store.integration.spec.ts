@@ -2,6 +2,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { randomUUID } from 'crypto';
+import { readFileSync } from 'fs';
 import { Pool } from 'pg';
 import * as request from 'supertest';
 import { ConfigService } from '../../../config/config/config.service';
@@ -46,7 +47,6 @@ integration('PostgreSQL v2 job registry', () => {
       POSTGRES_URL: url.toString(),
       POSTGRES_SSL: 'false',
       POSTGRES_CA_FILE: '',
-      POSTGRES_MIGRATION_MODE: 'auto',
     };
     let config: ConfigService;
     try {
@@ -159,7 +159,6 @@ integration('PostgreSQL v2 job registry', () => {
       POSTGRES_URL: connectionUrl,
       POSTGRES_SSL: 'false',
       POSTGRES_CA_FILE: '',
-      POSTGRES_MIGRATION_MODE: 'auto',
     };
     let fullApp: INestApplication;
     try {

@@ -23,7 +23,6 @@ describe('ConfigService', () => {
       delete process.env.POSTGRES_URL;
       delete process.env.POSTGRES_SSL;
       delete process.env.POSTGRES_CA_FILE;
-      delete process.env.POSTGRES_MIGRATION_MODE;
       delete process.env.DB_HOSTS;
       delete process.env.DB_JOBS_IDX;
     });
@@ -67,7 +66,6 @@ describe('ConfigService', () => {
       expect(config.getPostgresql('url')).toBe('postgresql://localhost/jobs');
       expect(config.getPostgresql('ssl')).toBe(false);
       expect(config.getPostgresql('caFile')).toBe('');
-      expect(config.getPostgresql('migrationMode')).toBe('auto');
       expect(() => config.get('database.jobStore.elasticsearch')).toThrow();
       expect(() => config.get('database.legacyElasticsearch')).toThrow();
       expect(() => config.getElasticsearch('hosts')).toThrow();
@@ -85,16 +83,6 @@ describe('ConfigService', () => {
     it('rejects unknown job store types', () => {
       process.env.JOB_STORE_TYPE = 'unknown';
       expect(() => new ConfigService()).toThrow();
-    });
-
-    it('validates the PostgreSQL migration mode only when selected', () => {
-      process.env.POSTGRES_MIGRATION_MODE = 'invalid';
-      expect(() => new ConfigService()).not.toThrow();
-      process.env.JOB_STORE_TYPE = 'postgresql';
-      process.env.POSTGRES_URL = 'postgresql://localhost/jobs';
-      expect(() => new ConfigService()).toThrow();
-      process.env.POSTGRES_MIGRATION_MODE = 'verify';
-      expect(new ConfigService().getPostgresql('migrationMode')).toBe('verify');
     });
 
     it('validates PostgreSQL settings only when selected', () => {
