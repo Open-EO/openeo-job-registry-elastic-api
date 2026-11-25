@@ -56,13 +56,6 @@ export class DocumentdbJobStore extends JobStore implements OnModuleDestroy {
 
   async checkHealth(): Promise<JobStoreHealth> {
     try {
-      const exists = await this.database
-        .listCollections(
-          { name: this.collection.collectionName },
-          { nameOnly: true },
-        )
-        .hasNext();
-      if (!exists) throw new Error('Job collection does not exist');
       await this.collection.findOne({}, { projection: { _id: 1 } });
       return { name: 'documentdb', status: 'up' };
     } catch {

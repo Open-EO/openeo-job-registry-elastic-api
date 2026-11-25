@@ -272,12 +272,12 @@ integration('DocumentDB v2 job registry', () => {
     expect(next.body.jobs).toEqual([{ job_id: 'p-c' }, { job_id: 'p-d' }]);
   });
 
-  it('reports the collection missing', async () => {
+  it('treats a missing collection like an empty collection in the read probe', async () => {
     await admin.db(database).collection(collection).rename('hidden');
     try {
       await expect(store.checkHealth()).resolves.toEqual({
         name: 'documentdb',
-        status: 'down',
+        status: 'up',
       });
     } finally {
       await admin.db(database).collection('hidden').rename(collection);

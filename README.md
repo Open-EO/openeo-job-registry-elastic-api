@@ -102,9 +102,11 @@ Choose `JOB_STORE_TYPE=documentdb` and configure:
 Use a dedicated **unsharded collection with simple binary collation** and
 restrict writes to the registry. This preserves globally unique job IDs and
 deterministic ordering. Grant the runtime account
-permission to list collections and read, insert, and replace documents in the
-job collection. The readiness check reports down if the collection is missing
-or inaccessible; the application does not create it or manage indexes. Before
+permission to read, insert, and replace documents in the job collection. The
+readiness check performs a collection-scoped read and reports down on read
+errors. MongoDB treats a missing collection like an empty one for reads, so
+readiness cannot verify that the collection exists. The application does not
+create it or manage indexes. Before
 running index migrations, provision a separate, unsharded migration metadata
 collection with simple binary collation. For example, after selecting the
 database in `mongosh`:
