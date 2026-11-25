@@ -7,7 +7,7 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-FROM node:26-bookworm-slim AS elasticsearch
+FROM node:26-bookworm-slim AS runtime
 ARG NODE_ENV=production
 ENV NODE_ENV=${NODE_ENV}
 WORKDIR /usr/src/app
@@ -15,7 +15,10 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 RUN npm install --only=production
 COPY --from=builder /usr/src/app/dist ./dist
-COPY --from=builder /usr/src/app/migrations/documentdb ./migrations/documentdb
-
 EXPOSE 3000
 CMD ["node", "dist/src/main.js"]
+
+FROM runtime AS documentdb
+COPY --from=builder /usr/src/app/migrations/documentdb ./migrations/documentdb
+
+FROM runtime AS elasticsearch

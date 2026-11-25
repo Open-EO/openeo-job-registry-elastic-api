@@ -66,9 +66,17 @@ require explicit migration before v2 direct access; legacy routes are unchanged.
 
 ### Container images
 
-One API image supports both Elasticsearch and DocumentDB. Build locally with
-`docker build -t job-registry:api .`. The published Elasticsearch and DocumentDB
-tags contain the same runtime; `JOB_STORE_TYPE` selects the backend.
+The images share the same API runtime and support both backends; `JOB_STORE_TYPE`
+selects the backend. The DocumentDB image additionally contains its migration
+files. Build the appropriate image locally:
+
+```bash
+docker build --target elasticsearch -t job-registry:elasticsearch .
+docker build --target documentdb -t job-registry:documentdb .
+```
+
+An unqualified `docker build` produces the Elasticsearch image. The unqualified
+release and `latest` tags also refer to the Elasticsearch image.
 
 Each `JobStore` implements its own health probe; the health endpoint reports the
 selected backend and authentication status. Elasticsearch checks every
@@ -111,7 +119,7 @@ shard them. The initial migration creates the job collection if it does not
 exist, without modifying an existing collection. Verify collation and sharding
 before starting the API; the migration command does not check these.
 
-Run `npm run documentdb:migrate` from the built API image, before rolling out
+Run `npm run documentdb:migrate` from the DocumentDB image, before rolling out
 the API. Supply `DOCUMENTDB_MIGRATION_URL` as a secret for a dedicated
 migration identity, together with the same `DOCUMENTDB_DATABASE`,
 `DOCUMENTDB_COLLECTION`, and `DOCUMENTDB_TLS` as the API. The migration URL

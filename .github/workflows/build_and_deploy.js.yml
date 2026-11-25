@@ -52,9 +52,10 @@ jobs:
     - run: npm install
     - run: npm run test:cov
     - run: npm run build
-    - name: Build container image
+    - name: Build container images
       run: |
         docker build --target elasticsearch -t job-registry:ci-elasticsearch .
+        docker build --target documentdb -t job-registry:ci-documentdb .
 
   pr-image:
     needs: build
@@ -73,7 +74,8 @@ jobs:
         run: |
           docker build --target elasticsearch \
             -t "$IMAGE_NAME:elasticsearch" \
-            -t "$IMAGE_NAME:elasticsearch-${GITHUB_SHA}" \
+            -t "$IMAGE_NAME:elasticsearch-${GITHUB_SHA}" .
+          docker build --target documentdb \
             -t "$IMAGE_NAME:documentdb" \
             -t "$IMAGE_NAME:documentdb-${GITHUB_SHA}" .
       - name: Log in to GitHub Container Registry
@@ -203,7 +205,8 @@ jobs:
             -t "$IMAGE_NAME:${{ needs.release.outputs.docker_version }}-elasticsearch" \
             -t "$IMAGE_NAME:${{ needs.release.outputs.docker_version }}" \
             -t "$IMAGE_NAME:latest-elasticsearch" \
-            -t "$IMAGE_NAME:latest" \
+            -t "$IMAGE_NAME:latest" .
+          docker build --target documentdb \
             -t "$IMAGE_NAME:${{ needs.release.outputs.docker_version }}-documentdb" \
             -t "$IMAGE_NAME:latest-documentdb" .
 
