@@ -158,7 +158,7 @@ export const schema = (jobStoreType: string): convict.Schema<AppConfig> => ({
               collection: {
                 doc: 'DocumentDB job collection name',
                 format: 'String',
-                default: 'job_registry_v2',
+                default: 'job_registry',
                 env: 'DOCUMENTDB_COLLECTION',
               },
               tls: {

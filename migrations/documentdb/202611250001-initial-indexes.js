@@ -10,9 +10,12 @@ const indexes = [
 
 module.exports = {
   async up(db) {
-    const collection = db.collection(
-      process.env.DOCUMENTDB_COLLECTION ?? 'job_registry_v2',
-    );
+    const name = process.env.DOCUMENTDB_COLLECTION ?? 'job_registry';
+    const existing = await db
+      .listCollections({ name }, { nameOnly: true })
+      .next();
+    if (!existing) await db.createCollection(name);
+    const collection = db.collection(name);
     for (const index of indexes) {
       await collection.createIndex(index.key, { name: index.name });
     }

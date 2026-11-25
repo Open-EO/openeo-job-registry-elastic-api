@@ -77,7 +77,7 @@ describe('ConfigService', () => {
       process.env.DOCUMENTDB_DATABASE = 'jobs';
       const config = new ConfigService();
       expect(config.getDocumentdb('database')).toBe('jobs');
-      expect(config.getDocumentdb('collection')).toBe('job_registry_v2');
+      expect(config.getDocumentdb('collection')).toBe('job_registry');
       expect(config.getDocumentdb('tls')).toBe(true);
       expect(() => config.get('database.jobStore.elasticsearch')).toThrow();
       expect(() => config.getElasticsearch('hosts')).toThrow();

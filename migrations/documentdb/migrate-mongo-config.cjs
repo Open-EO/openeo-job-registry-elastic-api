@@ -1,6 +1,6 @@
 const url = process.env.DOCUMENTDB_MIGRATION_URL;
 const database = process.env.DOCUMENTDB_DATABASE;
-const collection = process.env.DOCUMENTDB_COLLECTION ?? 'job_registry_v2';
+const collection = process.env.DOCUMENTDB_COLLECTION ?? 'job_registry';
 const tls = process.env.DOCUMENTDB_TLS ?? 'true';
 
 module.exports = {
