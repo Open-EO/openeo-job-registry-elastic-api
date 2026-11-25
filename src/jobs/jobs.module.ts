@@ -17,6 +17,7 @@ import { JobStore } from './stores/job-store';
 import { ElasticsearchJobStore } from './stores/elasticsearch/elasticsearch-job-store';
 import { JobRegistryService } from './services/job-registry.service';
 import { PostgresqlJobStore } from './stores/postgresql/postgresql-job-store';
+import { DocumentdbJobStore } from './stores/documentdb/documentdb-job-store';
 import { ElasticsearchHealthProbe } from './stores/elasticsearch/elasticsearch-health-probe';
 import { HttpModule } from '@nestjs/axios';
 import { JobStoreType } from './stores/job-store-types';
@@ -47,6 +48,9 @@ const jobStoreRegistrations: Record<JobStoreType, () => JobStoreRegistration> =
     }),
     postgresql: () => ({
       store: PostgresqlJobStore,
+    }),
+    documentdb: () => ({
+      store: DocumentdbJobStore,
     }),
   };
 

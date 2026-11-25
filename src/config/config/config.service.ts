@@ -4,11 +4,13 @@ import * as convict_validator from 'convict-format-with-validator';
 import {
   AppConfig,
   ElasticsearchConfig,
+  DocumentdbConfig,
   PostgresqlConfig,
   schema,
 } from '../schema/config.schema';
 import * as dotenv from 'dotenv';
 import { AuthType } from '../../auth/models/authtypes.enum';
+import { MongoClient } from 'mongodb';
 
 @Injectable()
 export class ConfigService {
@@ -22,6 +24,9 @@ export class ConfigService {
     this.validateEntraConfig();
     if (this.get('database.jobStore.type') === 'postgresql') {
       this.validatePostgresqlConfig();
+    }
+    if (this.get('database.jobStore.type') === 'documentdb') {
+      this.validateDocumentdbConfig();
     }
   }
 
@@ -94,6 +99,41 @@ export class ConfigService {
     }
   }
 
+  private validateDocumentdbConfig(): void {
+    const url = this.getDocumentdb('url');
+    if (!url) throw new Error('DOCUMENTDB_URL is required');
+    if (!this.getDocumentdb('database').trim())
+      throw new Error('DOCUMENTDB_DATABASE is required');
+    if (!this.getDocumentdb('collection').trim())
+      throw new Error('DOCUMENTDB_COLLECTION is required');
+    const options = new URLSearchParams(url.split('?')[1] || '');
+    for (const [key, value] of options) {
+      if (
+        [
+          'tlsinsecure',
+          'tlsallowinvalidcertificates',
+          'tlsallowinvalidhostnames',
+        ].includes(key.toLowerCase()) &&
+        value.toLowerCase() !== 'false'
+      ) {
+        throw new Error('DOCUMENTDB_URL cannot disable TLS verification');
+      }
+    }
+    try {
+      new MongoClient(url, {
+        tls: this.getDocumentdb('tls'),
+        retryWrites: false,
+        serverSelectionTimeoutMS: 5000,
+        writeConcern: { w: 1 },
+        readPreference: 'primary',
+      });
+    } catch {
+      throw new Error(
+        'DOCUMENTDB_URL must be a valid MongoDB connection string',
+      );
+    }
+  }
+
   get(configName: string) {
     return this.config.get(configName);
   }
@@ -114,5 +154,11 @@ export class ConfigService {
     field: K,
   ): PostgresqlConfig[K] {
     return this.get(`database.jobStore.postgresql.${field}`);
+  }
+
+  getDocumentdb<K extends keyof DocumentdbConfig>(
+    field: K,
+  ): DocumentdbConfig[K] {
+    return this.get(`database.jobStore.documentdb.${field}`);
   }
 }

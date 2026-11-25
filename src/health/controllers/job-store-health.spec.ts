@@ -5,7 +5,7 @@ import { AuthIndicator } from '../indicators/auth.indicator';
 import { HealthController } from './health.controller';
 
 describe('Job store health check', () => {
-  it.each(['postgresql', 'elasticsearch', 'other'])(
+  it.each(['postgresql', 'elasticsearch', 'documentdb', 'other'])(
     'reports health for the %s store without implementation-specific logic',
     async (name) => {
       const store = {

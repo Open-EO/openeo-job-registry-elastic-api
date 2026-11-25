@@ -6,6 +6,7 @@ import { JobStore } from './stores/job-store';
 import { JobStoreType } from './stores/job-store-types';
 import { ElasticsearchJobStore } from './stores/elasticsearch/elasticsearch-job-store';
 import { PostgresqlJobStore } from './stores/postgresql/postgresql-job-store';
+import { DocumentdbJobStore } from './stores/documentdb/documentdb-job-store';
 
 describe('JobsModule store registration', () => {
   it('registers the Elasticsearch adapter and legacy controller', () => {
@@ -25,6 +26,16 @@ describe('JobsModule store registration', () => {
     expect(module.providers).toContainEqual({
       provide: JobStore,
       useClass: PostgresqlJobStore,
+    });
+  });
+
+  it('registers DocumentDB without Elasticsearch legacy dependencies', () => {
+    const module = JobsModule.register('documentdb');
+    expect(module.controllers).toEqual([JobsV2Controller]);
+    expect(module.providers).not.toContain(DatabaseService);
+    expect(module.providers).toContainEqual({
+      provide: JobStore,
+      useClass: DocumentdbJobStore,
     });
   });
 

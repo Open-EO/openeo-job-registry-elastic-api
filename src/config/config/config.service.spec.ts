@@ -23,6 +23,10 @@ describe('ConfigService', () => {
       delete process.env.POSTGRES_URL;
       delete process.env.POSTGRES_SSL;
       delete process.env.POSTGRES_CA_FILE;
+      delete process.env.DOCUMENTDB_URL;
+      delete process.env.DOCUMENTDB_DATABASE;
+      delete process.env.DOCUMENTDB_COLLECTION;
+      delete process.env.DOCUMENTDB_TLS;
       delete process.env.DB_HOSTS;
       delete process.env.DB_JOBS_IDX;
     });
@@ -134,6 +138,42 @@ describe('ConfigService', () => {
       process.env.JOB_STORE_TYPE = 'postgresql';
       process.env.POSTGRES_URL = 'postgresql://localhost/jobs';
       expect(() => new ConfigService()).not.toThrow();
+    });
+
+    it('validates DocumentDB settings only when selected', () => {
+      process.env.DOCUMENTDB_TLS = 'not-a-boolean';
+      expect(() => new ConfigService()).not.toThrow();
+      process.env.JOB_STORE_TYPE = 'documentdb';
+      process.env.DOCUMENTDB_TLS = 'true';
+      expect(() => new ConfigService()).toThrow('DOCUMENTDB_URL is required');
+      process.env.DOCUMENTDB_URL = 'mongodb://localhost:27017';
+      expect(() => new ConfigService()).toThrow(
+        'DOCUMENTDB_DATABASE is required',
+      );
+      process.env.DOCUMENTDB_DATABASE = 'jobs';
+      const config = new ConfigService();
+      expect(config.getDocumentdb('database')).toBe('jobs');
+      expect(config.getDocumentdb('collection')).toBe('job_registry_v2');
+      expect(config.getDocumentdb('tls')).toBe(true);
+      expect(() => config.get('database.jobStore.postgresql')).toThrow();
+      expect(() => config.get('database.jobStore.elasticsearch')).toThrow();
+    });
+
+    it.each([
+      ['not-a-url', 'valid MongoDB connection string'],
+      [
+        'mongodb://localhost/?tlsInsecure=true',
+        'cannot disable TLS verification',
+      ],
+      [
+        'mongodb://localhost/?tlsAllowInvalidCertificates=true',
+        'cannot disable TLS verification',
+      ],
+    ])('rejects unsafe or invalid DocumentDB URL', (url, message) => {
+      process.env.JOB_STORE_TYPE = 'documentdb';
+      process.env.DOCUMENTDB_DATABASE = 'jobs';
+      process.env.DOCUMENTDB_URL = url;
+      expect(() => new ConfigService()).toThrow(message);
     });
   });
 

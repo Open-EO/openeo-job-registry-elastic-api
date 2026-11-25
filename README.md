@@ -143,6 +143,55 @@ To run the PostgreSQL integration tests, set `TEST_POSTGRES_URL` to a
 The tests create and remove their own schema and do not require Flyway.
 Without this variable they are skipped.
 
+### Azure DocumentDB storage for v2
+
+The v2 registry can also use Azure DocumentDB (the MongoDB-compatible vCore
+service), independently of any collections used for logs or vectors. This is
+not the Cosmos DB for NoSQL API or the RU-based Cosmos DB for MongoDB API.
+Choose `JOB_STORE_TYPE=documentdb` and configure:
+
+- `DOCUMENTDB_URL`: MongoDB connection string, kept in a secret. The driver
+  uses TLS with certificate verification, primary reads and acknowledged writes;
+  retryable writes are disabled for Azure DocumentDB.
+- `DOCUMENTDB_DATABASE`: an existing database name.
+- `DOCUMENTDB_COLLECTION`: the job collection (default `job_registry_v2`).
+- `DOCUMENTDB_TLS`: defaults to `true`; set to `false` only for local testing.
+  Certificate-verification bypass options in the URL are rejected.
+
+Provision a dedicated **unsharded collection with simple binary collation**
+before starting the API, and restrict writes to the registry. This preserves
+globally unique job IDs and deterministic ordering. Grant the runtime account
+permission to list collections and read, insert, and replace documents in the
+job collection. The readiness check reports down if the collection is missing
+or inaccessible; the application does not create it or manage indexes.
+For example, after selecting the database in `mongosh`:
+
+```javascript
+db.createCollection("job_registry_v2")
+db.job_registry_v2.createIndex({ user_id: 1 })
+db.job_registry_v2.createIndex({ backend_id: 1 })
+db.job_registry_v2.createIndex({ status: 1 })
+db.job_registry_v2.createIndex({ infra_id: 1 })
+db.job_registry_v2.createIndex({ application_id: 1 })
+db.job_registry_v2.createIndex({ created: 1 })
+db.job_registry_v2.createIndex({ updated: 1 })
+```
+
+These are starting points for filtering, not a guarantee of query performance.
+DocumentDB may sort in memory; benchmark representative listings and size the
+service for both jobs and logs. Job fields are stored as individually
+JSON-encoded values to preserve arbitrary nested keys, with separate indexed
+filter and pagination metadata. DocumentDB's 16 MB BSON document limit applies
+to the entire stored job, including this metadata. Legacy `/jobs` routes are
+disabled, existing jobs are not migrated automatically, and continuation
+positions should not be reused across a backend switch.
+
+To run the integration tests, set `TEST_DOCUMENTDB_URL` to a server on which
+the test user may create and drop a **dedicated test database**, optionally set
+`TEST_DOCUMENTDB_TLS=true`, then run
+`npm test -- --runInBand documentdb-job-store.integration.spec.ts`. The tests
+create and drop a randomly named database. They are skipped without the URL.
+
 ## Installation
 
 Node.js 26 or newer is required.

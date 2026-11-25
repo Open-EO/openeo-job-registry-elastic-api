@@ -15,6 +15,13 @@ export interface PostgresqlConfig {
   caFile: string;
 }
 
+export interface DocumentdbConfig {
+  url: string;
+  database: string;
+  collection: string;
+  tls: boolean;
+}
+
 export interface ElasticsearchConfig {
   hosts: string;
   jobsIdx: string;
@@ -159,6 +166,37 @@ export const schema = (jobStoreType: string): convict.Schema<AppConfig> => ({
                 format: 'String',
                 default: '',
                 env: 'POSTGRES_CA_FILE',
+              },
+            },
+          }
+        : {}),
+      ...(jobStoreType === 'documentdb'
+        ? {
+            documentdb: {
+              url: {
+                doc: 'Azure DocumentDB MongoDB connection string',
+                format: 'String',
+                default: '',
+                env: 'DOCUMENTDB_URL',
+                sensitive: true,
+              },
+              database: {
+                doc: 'DocumentDB database name',
+                format: 'String',
+                default: '',
+                env: 'DOCUMENTDB_DATABASE',
+              },
+              collection: {
+                doc: 'DocumentDB job collection name',
+                format: 'String',
+                default: 'job_registry_v2',
+                env: 'DOCUMENTDB_COLLECTION',
+              },
+              tls: {
+                doc: 'Use TLS with certificate verification',
+                format: 'Boolean',
+                default: true,
+                env: 'DOCUMENTDB_TLS',
               },
             },
           }
