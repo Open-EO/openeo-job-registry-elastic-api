@@ -94,21 +94,57 @@ before starting the API, and restrict writes to the registry. This preserves
 globally unique job IDs and deterministic ordering. Grant the runtime account
 permission to list collections and read, insert, and replace documents in the
 job collection. The readiness check reports down if the collection is missing
-or inaccessible; the application does not create it or manage indexes.
-For example, after selecting the database in `mongosh`:
+or inaccessible; the application does not create it or manage indexes. Before
+running index migrations, provision the job collection and a separate,
+unsharded migration metadata collection with simple binary collation. For
+example, after selecting the database in `mongosh`:
 
 ```javascript
 db.createCollection("job_registry_v2")
-db.job_registry_v2.createIndex({ user_id: 1 })
-db.job_registry_v2.createIndex({ backend_id: 1 })
-db.job_registry_v2.createIndex({ status: 1 })
-db.job_registry_v2.createIndex({ infra_id: 1 })
-db.job_registry_v2.createIndex({ application_id: 1 })
-db.job_registry_v2.createIndex({ created: 1 })
-db.job_registry_v2.createIndex({ updated: 1 })
+db.createCollection("job_registry_v2__index_migrations")
 ```
 
-These are starting points for filtering, not a guarantee of query performance.
+For a custom `DOCUMENTDB_COLLECTION`, name the metadata collection by appending
+`__index_migrations`. Do not share either collection with other applications or
+shard them. Verify collection existence, collation, and sharding before running
+the migration; the migration command does not check these.
+
+Run `npm run documentdb:migrate` from the built API image, before rolling out
+the API. Supply `DOCUMENTDB_MIGRATION_URL` as a secret for a dedicated
+migration identity, together with the same `DOCUMENTDB_DATABASE`,
+`DOCUMENTDB_COLLECTION`, and `DOCUMENTDB_TLS` as the API. The migration URL
+uses the same TLS verification rules as the runtime connection; do not pass
+credentials in command-line arguments. The command does not use
+`DOCUMENTDB_URL` and does not start the API. Grant the migration identity
+`createIndex` on the job collection, and `find` and `insert` on the metadata
+collection; later migrations may need additional privileges. Pre-provision both
+collections to ensure their configuration is correct. The runtime identity
+does not need migration privileges.
+
+The [versioned migration files](migrations/documentdb/) run through
+`migrate-mongo`. The initial migration creates single-field indexes on
+`user_id`, `backend_id`, `status`, `infra_id`, `application_id`, `created`,
+and `updated`. Matching pre-existing indexes are reused; conflicting
+definitions cause an error. Never edit an applied migration: `migrate-mongo`
+tracks filenames, not file contents, and does not detect edits or index drift.
+Add a new timestamp-prefixed `.js` migration with an idempotent `up(db, client)`
+function instead (generate a template with
+`npx migrate-mongo create add-index -f migrations/documentdb/migrate-mongo-config.cjs`).
+To replace an index, add and verify the new one first; remove
+the old one in a later version after old API instances are retired.
+
+The deployment process must run **only one migration job at a time** and wait
+for it to complete before rolling out the API. The library's TTL-based locking
+is disabled because it may expire during a long-running index build and does
+not atomically prevent concurrent jobs. If a migration fails or a runner stops,
+first confirm that no runner or server-side index build is still active before
+retrying. Migrations must be safe to rerun after partial execution; do not delete
+changelog records as a recovery shortcut. If the previous custom runner's
+`version:*` records exist, stop and independently assess the index definitions
+and history before adopting this command: migrate-mongo does not recognize
+those records.
+
+These indexes are starting points for filtering, not a guarantee of query performance.
 DocumentDB may sort in memory; benchmark representative listings and size the
 service for both jobs and logs. Job fields are stored as individually
 JSON-encoded values to preserve arbitrary nested keys, with separate indexed
@@ -124,6 +160,9 @@ the test user may create and drop a **dedicated test database**, optionally set
 `TEST_DOCUMENTDB_TLS=true`, then run
 `npm test -- --runInBand documentdb-job-store.integration.spec.ts`. The tests
 create and drop a randomly named database. They are skipped without the URL.
+The same settings also enable `documentdb-migrations.integration.spec.ts`;
+test only with a dedicated database server where the test user may create and
+drop databases.
 
 ## Installation
 

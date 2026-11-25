@@ -9,7 +9,7 @@ import {
 } from '../schema/config.schema';
 import * as dotenv from 'dotenv';
 import { AuthType } from '../../auth/models/authtypes.enum';
-import { MongoClient } from 'mongodb';
+import { documentdbClient } from '../../jobs/stores/documentdb/documentdb-connection';
 
 @Injectable()
 export class ConfigService {
@@ -56,31 +56,15 @@ export class ConfigService {
       throw new Error('DOCUMENTDB_DATABASE is required');
     if (!this.getDocumentdb('collection').trim())
       throw new Error('DOCUMENTDB_COLLECTION is required');
-    const options = new URLSearchParams(url.split('?')[1] || '');
-    for (const [key, value] of options) {
-      if (
-        [
-          'tlsinsecure',
-          'tlsallowinvalidcertificates',
-          'tlsallowinvalidhostnames',
-        ].includes(key.toLowerCase()) &&
-        value.toLowerCase() !== 'false'
-      ) {
-        throw new Error('DOCUMENTDB_URL cannot disable TLS verification');
-      }
-    }
     try {
-      new MongoClient(url, {
-        tls: this.getDocumentdb('tls'),
-        retryWrites: false,
-        serverSelectionTimeoutMS: 5000,
-        writeConcern: { w: 1 },
-        readPreference: 'primary',
-      });
-    } catch {
-      throw new Error(
-        'DOCUMENTDB_URL must be a valid MongoDB connection string',
-      );
+      documentdbClient(url, this.getDocumentdb('tls'));
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(
+          error.message.replace('DocumentDB connection URL', 'DOCUMENTDB_URL'),
+        );
+      }
+      throw error;
     }
   }
 

@@ -1,15 +1,10 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import {
-  BSON,
-  Collection,
-  Db,
-  Filter,
-  MongoClient,
-  MongoServerError,
-} from 'mongodb';
+import { BSON, Collection, Db, Filter, MongoServerError } from 'mongodb';
 import { ConfigService } from '../../../config/config/config.service';
 import { Job, SearchJobs } from '../../models/job.v2.dto';
+import { documentdbClient } from './documentdb-connection';
+import { MongoClient } from 'mongodb';
 import {
   JobSource,
   JobStore,
@@ -45,13 +40,10 @@ export class DocumentdbJobStore extends JobStore implements OnModuleDestroy {
   constructor(config: ConfigService) {
     super();
     this.logger = new Logger(DocumentdbJobStore.name);
-    this.client = new MongoClient(config.getDocumentdb('url'), {
-      tls: config.getDocumentdb('tls'),
-      retryWrites: false,
-      serverSelectionTimeoutMS: 5000,
-      writeConcern: { w: 1 },
-      readPreference: 'primary',
-    });
+    this.client = documentdbClient(
+      config.getDocumentdb('url'),
+      config.getDocumentdb('tls'),
+    );
     this.database = this.client.db(config.getDocumentdb('database'));
     this.collection = this.database.collection<JobDocument>(
       config.getDocumentdb('collection'),
