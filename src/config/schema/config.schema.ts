@@ -9,12 +9,6 @@ export interface AppConfig {
   port: number;
 }
 
-export interface PostgresqlConfig {
-  url: string;
-  ssl: boolean;
-  caFile: string;
-}
-
 export interface DocumentdbConfig {
   url: string;
   database: string;
@@ -141,31 +135,6 @@ export const schema = (jobStoreType: string): convict.Schema<AppConfig> => ({
                 default: 'openeo-jobs-dev',
                 env: 'DB_JOBS_IDX',
                 arg: 'db_jobs_idx',
-              },
-            },
-          }
-        : {}),
-      ...(jobStoreType === 'postgresql'
-        ? {
-            postgresql: {
-              url: {
-                doc: 'PostgreSQL connection URL for the job registry',
-                format: 'String',
-                default: '',
-                env: 'POSTGRES_URL',
-                sensitive: true,
-              },
-              ssl: {
-                doc: 'Verify the PostgreSQL server TLS certificate',
-                format: 'Boolean',
-                default: true,
-                env: 'POSTGRES_SSL',
-              },
-              caFile: {
-                doc: 'Optional PEM CA bundle for PostgreSQL TLS',
-                format: 'String',
-                default: '',
-                env: 'POSTGRES_CA_FILE',
               },
             },
           }

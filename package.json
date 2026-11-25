@@ -17,7 +17,6 @@
     "start:dev": "nest start --watch | pino-pretty",
     "start:debug": "nest start --debug --watch | pino-pretty",
     "start:prod": "node dist/main",
-    "db:migrate": "flyway migrate",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -53,7 +52,6 @@
     "openid-client": "^5.2.1",
     "passport": "^0.6.0",
     "passport-http-bearer": "^1.0.1",
-    "pg": "^8.23.1",
     "pino": "^9.1.0",
     "pino-http": "^10.1.0",
     "pino-pretty": "^11.0.0",
@@ -76,7 +74,6 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^26.0.0",
     "@types/openid-client": "^3.7.0",
-    "@types/pg": "^8.23.1",
     "@types/supertest": "^2.0.11",
     "@typescript-eslint/eslint-plugin": "^5.0.0",
     "@typescript-eslint/parser": "^5.0.0",
@@ -135,8 +132,7 @@
       "main.ts",
       "bearer.guard",
       ".mock.ts",
-      ".middleware.ts",
-      "postgresql-job-store.ts"
+      ".middleware.ts"
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
