@@ -85,29 +85,31 @@ Choose `JOB_STORE_TYPE=documentdb` and configure:
   uses TLS with certificate verification, primary reads and acknowledged writes;
   retryable writes are disabled for Azure DocumentDB.
 - `DOCUMENTDB_DATABASE`: an existing database name.
-- `DOCUMENTDB_COLLECTION`: the job collection (default `job_registry_v2`).
+- `DOCUMENTDB_COLLECTION`: the job collection (default `job_registry`).
+  Existing deployments using the former default must set this explicitly to
+  `job_registry_v2` to continue using that collection and its migration history.
 - `DOCUMENTDB_TLS`: defaults to `true`; set to `false` only for local testing.
   Certificate-verification bypass options in the URL are rejected.
 
-Provision a dedicated **unsharded collection with simple binary collation**
-before starting the API, and restrict writes to the registry. This preserves
-globally unique job IDs and deterministic ordering. Grant the runtime account
+Use a dedicated **unsharded collection with simple binary collation** and
+restrict writes to the registry. This preserves globally unique job IDs and
+deterministic ordering. Grant the runtime account
 permission to list collections and read, insert, and replace documents in the
 job collection. The readiness check reports down if the collection is missing
 or inaccessible; the application does not create it or manage indexes. Before
-running index migrations, provision the job collection and a separate,
-unsharded migration metadata collection with simple binary collation. For
-example, after selecting the database in `mongosh`:
+running index migrations, provision a separate, unsharded migration metadata
+collection with simple binary collation. For example, after selecting the
+database in `mongosh`:
 
 ```javascript
-db.createCollection("job_registry_v2")
-db.createCollection("job_registry_v2__index_migrations")
+db.createCollection("job_registry__index_migrations")
 ```
 
 For a custom `DOCUMENTDB_COLLECTION`, name the metadata collection by appending
 `__index_migrations`. Do not share either collection with other applications or
-shard them. Verify collection existence, collation, and sharding before running
-the migration; the migration command does not check these.
+shard them. The initial migration creates the job collection if it does not
+exist, without modifying an existing collection. Verify collation and sharding
+before starting the API; the migration command does not check these.
 
 Run `npm run documentdb:migrate` from the built API image, before rolling out
 the API. Supply `DOCUMENTDB_MIGRATION_URL` as a secret for a dedicated
@@ -116,17 +118,21 @@ migration identity, together with the same `DOCUMENTDB_DATABASE`,
 uses the same TLS verification rules as the runtime connection; do not pass
 credentials in command-line arguments. The command does not use
 `DOCUMENTDB_URL` and does not start the API. Grant the migration identity
-`createIndex` on the job collection, and `find` and `insert` on the metadata
-collection; later migrations may need additional privileges. Pre-provision both
-collections to ensure their configuration is correct. The runtime identity
-does not need migration privileges.
+`listCollections`, `createCollection`, and `createIndex` for the job collection,
+and `find` and `insert` on the metadata collection; later migrations may need
+additional privileges. Pre-provision the metadata collection to ensure its
+configuration is correct. The runtime identity does not need migration
+privileges.
 
 The [versioned migration files](migrations/documentdb/) run through
-`migrate-mongo`. The initial migration creates single-field indexes on
+`migrate-mongo`. The initial migration creates the job collection if needed and
+single-field indexes on
 `user_id`, `backend_id`, `status`, `infra_id`, `application_id`, `created`,
 and `updated`. Matching pre-existing indexes are reused; conflicting
 definitions cause an error. Never edit an applied migration: `migrate-mongo`
 tracks filenames, not file contents, and does not detect edits or index drift.
+If the initial migration was applied before collection creation was added, it
+will not run again; verify that the collection and indexes exist.
 Add a new timestamp-prefixed `.js` migration with an idempotent `up(db, client)`
 function instead (generate a template with
 `npx migrate-mongo create add-index -f migrations/documentdb/migrate-mongo-config.cjs`).
