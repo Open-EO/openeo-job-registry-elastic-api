@@ -134,6 +134,18 @@ additional privileges. Pre-provision the metadata collection to ensure its
 configuration is correct. The runtime identity does not need migration
 privileges.
 
+To keep an API instance from starting against an older schema, run
+`npm run documentdb:check-schema` from the same image before the API starts,
+for example as an init container. It uses the runtime `DOCUMENTDB_URL` with the
+same `DOCUMENTDB_DATABASE`, `DOCUMENTDB_COLLECTION`, and `DOCUMENTDB_TLS`, and
+needs only `find` on the metadata collection. It exits non-zero when any
+migration shipped with the image has not been applied, or when the database
+cannot be read. Applied migrations that the image does not know about (the
+database is ahead, e.g. after a rollback) are accepted, because migrations must
+remain compatible with older API versions. The command wraps
+`migrate-mongo`'s status check, which on its own always exits 0, and never runs
+or records migrations.
+
 The [versioned migration files](migrations/documentdb/) run through
 `migrate-mongo`. The initial migration creates the job collection if needed and
 single-field indexes on
