@@ -64,7 +64,7 @@ describe('E2E - Jobs', () => {
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [JobsModule],
+      imports: [JobsModule.register('elasticsearch')],
     }).compile();
 
     app = moduleFixture.createNestApplication();
@@ -148,7 +148,7 @@ describe('E2E - Jobs', () => {
             },
           },
         },
-        index: configService.get('database.jobsIdx'),
+        index: configService.getElasticsearch('jobsIdx'),
       });
     }
     await app.close();

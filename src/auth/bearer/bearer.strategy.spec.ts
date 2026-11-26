@@ -32,7 +32,7 @@ describe('BearerStrategy', () => {
 
     await strategy.verify('token', verified, 3);
 
-    expect(verifyMock).toBeCalledTimes(0);
+    expect(verifyMock).toHaveBeenCalledTimes(0);
     expect(verified.mock.calls.length).toEqual(1);
     expect(verified.mock.calls[0]).toEqual([
       VERIFICATION_ERRORS.NO_CLIENT,
@@ -54,10 +54,10 @@ describe('BearerStrategy', () => {
 
     await strategy.verify('token', verified, 3);
 
-    expect(verifyMock).toBeCalledTimes(1);
+    expect(verifyMock).toHaveBeenCalledTimes(1);
     expect(verified.mock.calls.length).toEqual(1);
-    expect(verified.mock.calls[0]).toEqual([null, {}, null]);
-    expect(mockCachingService.store).toBeCalledTimes(1);
+    expect(verified.mock.calls[0]).toEqual([null, { sub: undefined }, null]);
+    expect(mockCachingService.store).toHaveBeenCalledTimes(1);
   });
 
   it('should not verify token if not active', async () => {
@@ -70,14 +70,14 @@ describe('BearerStrategy', () => {
 
     await strategy.verify('token', verified, 3);
 
-    expect(verifyMock).toBeCalledTimes(1);
+    expect(verifyMock).toHaveBeenCalledTimes(1);
     expect(verified.mock.calls.length).toEqual(1);
     expect(verified.mock.calls[0]).toEqual([
       null,
       null,
       VERIFICATION_ERRORS.TOKEN_INVALID,
     ]);
-    expect(mockCachingService.store).toBeCalledTimes(0);
+    expect(mockCachingService.store).toHaveBeenCalledTimes(0);
   });
 
   it('should not validate the token if an error occurred during the token validation', async () => {
@@ -92,14 +92,14 @@ describe('BearerStrategy', () => {
 
     await strategy.verify('token', verified, 3);
 
-    expect(verifyMock).toBeCalledTimes(3);
+    expect(verifyMock).toHaveBeenCalledTimes(3);
     expect(verified.mock.calls.length).toEqual(1);
     expect(verified.mock.calls[0]).toEqual([
       VERIFICATION_ERRORS.GENERAL,
       null,
       null,
     ]);
-    expect(mockCachingService.store).toBeCalledTimes(0);
+    expect(mockCachingService.store).toHaveBeenCalledTimes(0);
   });
 
   it('should return cached result and skip introspection on cache hit', async () => {
@@ -111,8 +111,8 @@ describe('BearerStrategy', () => {
 
     await strategy.verify('token', verified, 3);
 
-    expect(verifyMock).toBeCalledTimes(0);
-    expect(mockCachingService.store).toBeCalledTimes(0);
+    expect(verifyMock).toHaveBeenCalledTimes(0);
+    expect(mockCachingService.store).toHaveBeenCalledTimes(0);
     expect(verified.mock.calls.length).toEqual(1);
     expect(verified.mock.calls[0]).toEqual([null, {}, null]);
   });
@@ -151,9 +151,13 @@ describe('BearerStrategy', () => {
     it('should verify the token when it has one of the required roles', async () => {
       const { verified, warnSpy } = await verifyWithRoles(buildToken(payload));
 
-      expect(verified.mock.calls[0]).toEqual([null, {}, null]);
-      expect(mockCachingService.store).toBeCalledTimes(1);
-      expect(warnSpy).not.toBeCalled();
+      expect(verified.mock.calls[0]).toEqual([
+        null,
+        { sub: payload.sub },
+        null,
+      ]);
+      expect(mockCachingService.store).toHaveBeenCalledTimes(1);
+      expect(warnSpy).not.toHaveBeenCalled();
     });
 
     it('should forbid the token when it has none of the required roles', async () => {
@@ -164,11 +168,11 @@ describe('BearerStrategy', () => {
         }),
       );
 
-      expect(mockClient.introspect).toBeCalledTimes(1);
+      expect(mockClient.introspect).toHaveBeenCalledTimes(1);
       expect(verified.mock.calls[0][0]).toBeInstanceOf(ForbiddenException);
       expect(verified.mock.calls[0].slice(1)).toEqual([null, null]);
-      expect(mockCachingService.store).toBeCalledTimes(0);
-      expect(warnSpy).toBeCalledTimes(1);
+      expect(mockCachingService.store).toHaveBeenCalledTimes(0);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
       expect(warnSpy.mock.calls[0][0]).toContain(payload.sub);
       expect(warnSpy.mock.calls[0][0]).toContain('rw-role');
     });
@@ -179,7 +183,7 @@ describe('BearerStrategy', () => {
       );
 
       expect(verified.mock.calls[0][0]).toBeInstanceOf(ForbiddenException);
-      expect(mockCachingService.store).toBeCalledTimes(0);
+      expect(mockCachingService.store).toHaveBeenCalledTimes(0);
     });
 
     it.each([
@@ -192,7 +196,7 @@ describe('BearerStrategy', () => {
         const { verified } = await verifyWithRoles(token);
 
         expect(verified.mock.calls[0][0]).toBeInstanceOf(ForbiddenException);
-        expect(mockCachingService.store).toBeCalledTimes(0);
+        expect(mockCachingService.store).toHaveBeenCalledTimes(0);
       },
     );
   });

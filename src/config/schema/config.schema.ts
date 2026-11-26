@@ -1,11 +1,27 @@
 import * as convict from 'convict';
 import { AuthType } from '../../auth/models/authtypes.enum';
+import {
+  DEFAULT_JOB_STORE_TYPE,
+  JOB_STORE_TYPES,
+} from '../../jobs/stores/job-store-types';
 
 export interface AppConfig {
   port: number;
 }
 
-export const schema: convict.Schema<AppConfig> = {
+export interface DocumentdbConfig {
+  url: string;
+  database: string;
+  collection: string;
+  tls: boolean;
+}
+
+export interface ElasticsearchConfig {
+  hosts: string;
+  jobsIdx: string;
+}
+
+export const schema = (jobStoreType: string): convict.Schema<AppConfig> => ({
   general: {
     port: {
       doc: 'Port that is used to bind the API',
@@ -65,23 +81,95 @@ export const schema: convict.Schema<AppConfig> = {
         env: 'OIDC_CLIENT_SECRET',
         default: 'client_secret',
         arg: 'oidc_client_secret',
+        sensitive: true,
+      },
+    },
+    entra: {
+      issuer: {
+        doc: 'Tenant-specific Entra v2 access-token issuer',
+        format: 'String',
+        default: '',
+        env: 'ENTRA_ISSUER',
+      },
+      audience: {
+        doc: 'Exact access-token audience (normally the API application UUID for v2 tokens)',
+        format: 'String',
+        default: '',
+        env: 'ENTRA_AUDIENCE',
+      },
+      roles: {
+        doc: 'Comma separated application roles; at least one must be present',
+        format: 'String',
+        default: 'JobRegistry.Access',
+        env: 'ENTRA_ROLES',
+      },
+      clientIds: {
+        doc: 'Comma separated allowed caller application IDs (azp claim)',
+        format: 'String',
+        default: '',
+        env: 'ENTRA_CLIENT_IDS',
       },
     },
   },
   database: {
-    hosts: {
-      doc: 'Comma seperated value list of elasticsearch hosts to use',
-      format: '*',
-      default: 'http://localhost:9200,http://localhost:9201',
-      env: 'DB_HOSTS',
-      arg: 'db_hosts',
-    },
-    jobsIdx: {
-      doc: 'Name of the ElasticSearch index that will be used to store the job information',
-      format: '*',
-      default: 'openeo-jobs-dev',
-      env: 'DB_JOBS_IDX',
-      arg: 'db_jobs_idx',
+    jobStore: {
+      type: {
+        doc: 'Storage backend for the v2 job registry',
+        format: [...JOB_STORE_TYPES],
+        default: DEFAULT_JOB_STORE_TYPE,
+        env: 'JOB_STORE_TYPE',
+      },
+      ...((jobStoreType ?? DEFAULT_JOB_STORE_TYPE) === 'elasticsearch'
+        ? {
+            elasticsearch: {
+              hosts: {
+                doc: 'Comma separated list of Elasticsearch hosts',
+                format: '*',
+                default: 'http://localhost:9200,http://localhost:9201',
+                env: 'DB_HOSTS',
+                arg: 'db_hosts',
+              },
+              jobsIdx: {
+                doc: 'Elasticsearch index used to store job information',
+                format: '*',
+                default: 'openeo-jobs-dev',
+                env: 'DB_JOBS_IDX',
+                arg: 'db_jobs_idx',
+              },
+            },
+          }
+        : {}),
+      ...(jobStoreType === 'documentdb'
+        ? {
+            documentdb: {
+              url: {
+                doc: 'Azure DocumentDB MongoDB connection string',
+                format: 'String',
+                default: '',
+                env: 'DOCUMENTDB_URL',
+                sensitive: true,
+              },
+              database: {
+                doc: 'DocumentDB database name',
+                format: 'String',
+                default: '',
+                env: 'DOCUMENTDB_DATABASE',
+              },
+              collection: {
+                doc: 'DocumentDB job collection name',
+                format: 'String',
+                default: 'job_registry',
+                env: 'DOCUMENTDB_COLLECTION',
+              },
+              tls: {
+                doc: 'Use TLS with certificate verification',
+                format: 'Boolean',
+                default: true,
+                env: 'DOCUMENTDB_TLS',
+              },
+            },
+          }
+        : {}),
     },
     maxResults: {
       doc: 'Max results to return for query',
@@ -134,4 +222,4 @@ export const schema: convict.Schema<AppConfig> = {
       },
     },
   },
-};
+});
